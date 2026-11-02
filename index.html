@@ -42,7 +42,7 @@
 
     const DEFAULT_AGENCY = {
       name: 'TRIOSEPT DESIGN STUDIO',
-      tagline: 'Branding & Graphic Design Agency',
+      tagline: 'Branding Agency',
       contactPerson: 'Vikas Modi',
       phone: '+91 96872 72246',
       email: 'triosept9@gmail.com',
@@ -55,6 +55,12 @@
       ifsc: 'PUNB0955500',
       upiId: '9687272246@pnb'
     };
+
+    const INITIAL_TEAM = [
+      { id: 'TM-1', name: 'Tanvi Joshi', role: 'Senior Packaging Designer', phone: '+91 98251 11222', email: 'tanvi@triosept.com', active: true },
+      { id: 'TM-2', name: 'Rohan Sharma', role: 'Brand Identity & Visualizer', phone: '+91 97123 33444', email: 'rohan@triosept.com', active: true },
+      { id: 'TM-3', name: 'Aarav Patel', role: 'Digital & Motion Specialist', phone: '+91 99244 55667', email: 'aarav@triosept.com', active: true }
+    ];
 
     const INITIAL_CLIENTS = [
       { id: 'CL-101', name: 'Vedic Pure Foods Pvt Ltd', contactPerson: 'Karan Shah', phone: '+91 98250 12345', email: 'karan@vedicpure.in', industry: 'FMCG Food & Snacks', city: 'Ahmedabad', gstin: '24AAACV1234F1Z8', totalBilled: 245000, outstanding: 15000 },
@@ -176,6 +182,7 @@
       const [activeTab, setActiveTab] = useState('dashboard');
       const [agency, setAgency] = useState(() => loadLocal('triosept_agency', DEFAULT_AGENCY));
       const [customSvg, setCustomSvg] = useState(() => localStorage.getItem('triosept_svg') || '');
+      const [team, setTeam] = useState(() => loadLocal('triosept_team', INITIAL_TEAM));
       const [clients, setClients] = useState(() => loadLocal('triosept_clients', INITIAL_CLIENTS));
       const [leads, setLeads] = useState(() => loadLocal('triosept_leads', INITIAL_LEADS));
       const [projects, setProjects] = useState(() => loadLocal('triosept_projects', INITIAL_PROJECTS));
@@ -184,19 +191,26 @@
       const [invoices, setInvoices] = useState(() => loadLocal('triosept_invoices', INITIAL_INVOICES));
       
       const [selectedClientForView, setSelectedClientForView] = useState(null);
+      const [selectedTeamMemberForView, setSelectedTeamMemberForView] = useState(null);
       const [printInvoiceData, setPrintInvoiceData] = useState(null);
       const [syncTime, setSyncTime] = useState(new Date().toLocaleTimeString());
 
-      // MODAL CONTROLS
+      // MODALS
       const [activeModal, setActiveModal] = useState(null);
       const [clientForm, setClientForm] = useState({ name: '', contactPerson: '', phone: '', email: '', industry: '', city: 'Ahmedabad', gstin: '' });
       const [leadForm, setLeadForm] = useState({ leadName: '', companyName: '', phone: '', email: '', service: 'FMCG Packaging Design', budget: 50000 });
-      const [projectForm, setProjectForm] = useState({ title: '', clientId: '', budget: 50000, deadline: '', designer: 'Vikas Modi', priority: 'High' });
-      const [taskForm, setTaskForm] = useState({ title: '', assignedTo: 'Design Team', dueDate: '', priority: 'Medium' });
+      const [projectForm, setProjectForm] = useState({ title: '', clientId: '', budget: 50000, deadline: '', designer: 'Tanvi Joshi', priority: 'High' });
+      const [taskForm, setTaskForm] = useState({ title: '', assignedTo: 'Tanvi Joshi', dueDate: '', priority: 'Medium' });
+      const [teamForm, setTeamForm] = useState({ name: '', role: 'Packaging Designer', phone: '', email: '' });
       const [expenseForm, setExpenseForm] = useState({ title: '', category: 'Software Subscriptions', amount: '', paymentMode: 'UPI' });
       const [progressModalData, setProgressModalData] = useState(null);
 
-      // ADVANCED INVOICE FORM STATE
+      // WHATSAPP MODULE STATE
+      const [waRecipient, setWaRecipient] = useState({ phone: '', name: '', type: 'client' });
+      const [waTemplate, setWaTemplate] = useState('update');
+      const [waCustomMessage, setWaCustomMessage] = useState('');
+
+      // INVOICE BUILDER STATE
       const [invoiceForm, setInvoiceForm] = useState({
         clientId: '',
         clientName: '',
@@ -204,20 +218,17 @@
         clientAddress: '',
         date: new Date().toISOString().split('T')[0],
         dueDate: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
-        taxType: 'CGST_SGST', // CGST_SGST (18%), IGST (18%), NONE (0%)
+        taxType: 'CGST_SGST',
         discount: 0,
         paidAmount: 0,
         paymentTerms: 'Payment due within 15 days upon receipt',
-        items: [
-          { desc: 'FMCG Packaging Design & 3D Visualizer Sprint', sac: '998391', qty: 1, rate: 35000 }
-        ]
+        items: [{ desc: 'FMCG Packaging Design & 3D Visualizer Sprint', sac: '998391', qty: 1, rate: 35000 }]
       });
-
-      // INVOICE FILTER STATE
       const [invoiceFilterStatus, setInvoiceFilterStatus] = useState('ALL');
 
       useEffect(() => {
         localStorage.setItem('triosept_agency', JSON.stringify(agency));
+        localStorage.setItem('triosept_team', JSON.stringify(team));
         localStorage.setItem('triosept_clients', JSON.stringify(clients));
         localStorage.setItem('triosept_leads', JSON.stringify(leads));
         localStorage.setItem('triosept_projects', JSON.stringify(projects));
@@ -226,27 +237,23 @@
         localStorage.setItem('triosept_invoices', JSON.stringify(invoices));
         if (customSvg) localStorage.setItem('triosept_svg', customSvg);
         setSyncTime(new Date().toLocaleTimeString());
-      }, [agency, clients, leads, projects, tasks, expenses, invoices, customSvg]);
+      }, [agency, team, clients, leads, projects, tasks, expenses, invoices, customSvg]);
 
       const totalRevenue = useMemo(() => invoices.reduce((acc, inv) => acc + (inv.paidAmount || 0), 0), [invoices]);
       const totalExpenses = useMemo(() => expenses.reduce((acc, exp) => acc + exp.amount, 0), [expenses]);
       const netProfit = totalRevenue - totalExpenses;
       const totalOutstanding = useMemo(() => invoices.reduce((acc, inv) => acc + (inv.amount - (inv.paidAmount || 0)), 0), [invoices]);
 
-      // FILTERED INVOICES
       const filteredInvoices = useMemo(() => {
         if (invoiceFilterStatus === 'ALL') return invoices;
         return invoices.filter(i => i.status === invoiceFilterStatus);
       }, [invoices, invoiceFilterStatus]);
 
-      // INVOICE CALCULATIONS IN FORM
       const invoiceCalculations = useMemo(() => {
         const subtotal = invoiceForm.items.reduce((acc, item) => acc + ((parseInt(item.qty) || 1) * (parseFloat(item.rate) || 0)), 0);
         const discountedSubtotal = Math.max(0, subtotal - (parseFloat(invoiceForm.discount) || 0));
         let taxRate = 0;
-        if (invoiceForm.taxType === 'CGST_SGST' || invoiceForm.taxType === 'IGST') {
-          taxRate = 0.18;
-        }
+        if (invoiceForm.taxType === 'CGST_SGST' || invoiceForm.taxType === 'IGST') taxRate = 0.18;
         const taxAmount = Math.round(discountedSubtotal * taxRate);
         const grandTotal = discountedSubtotal + taxAmount;
         const balanceDue = Math.max(0, grandTotal - (parseFloat(invoiceForm.paidAmount) || 0));
@@ -262,29 +269,20 @@
         }
       };
 
-      // LINE ITEM CONTROLS FOR INVOICE FORM
+      // LINE ITEM CONTROLS
       const addInvoiceItem = () => {
-        setInvoiceForm({
-          ...invoiceForm,
-          items: [...invoiceForm.items, { desc: '', sac: '998391', qty: 1, rate: 0 }]
-        });
+        setInvoiceForm({ ...invoiceForm, items: [...invoiceForm.items, { desc: '', sac: '998391', qty: 1, rate: 0 }] });
       };
-
       const removeInvoiceItem = (index) => {
         if (invoiceForm.items.length <= 1) return;
-        setInvoiceForm({
-          ...invoiceForm,
-          items: invoiceForm.items.filter((_, i) => i !== index)
-        });
+        setInvoiceForm({ ...invoiceForm, items: invoiceForm.items.filter((_, i) => i !== index) });
       };
-
       const updateInvoiceItem = (index, field, value) => {
         const updated = [...invoiceForm.items];
         updated[index][field] = value;
         setInvoiceForm({ ...invoiceForm, items: updated });
       };
 
-      // SELECT PRESET CLIENT IN INVOICE FORM
       const handleSelectClientForInvoice = (clientId) => {
         const found = clients.find(c => c.id === clientId);
         if (found) {
@@ -298,19 +296,15 @@
         }
       };
 
-      // SUBMIT INVOICE
+      // SUBMIT HANDLERS
       const handleCreateInvoice = (e) => {
         e.preventDefault();
         if (!invoiceForm.clientName) return;
-
         const { subtotal, taxAmount, grandTotal } = invoiceCalculations;
         const paid = parseFloat(invoiceForm.paidAmount) || 0;
         let derivedStatus = 'Unpaid';
-        if (paid >= grandTotal && grandTotal > 0) {
-          derivedStatus = 'Paid';
-        } else if (paid > 0) {
-          derivedStatus = 'Partially Paid';
-        }
+        if (paid >= grandTotal && grandTotal > 0) derivedStatus = 'Paid';
+        else if (paid > 0) derivedStatus = 'Partially Paid';
 
         const newInvoice = {
           id: `INV-2026-${Math.floor(100 + Math.random() * 900)}`,
@@ -339,23 +333,8 @@
 
         setInvoices([newInvoice, ...invoices]);
         setActiveModal(null);
-        // Reset form
-        setInvoiceForm({
-          clientId: '',
-          clientName: '',
-          clientGstin: '',
-          clientAddress: '',
-          date: new Date().toISOString().split('T')[0],
-          dueDate: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
-          taxType: 'CGST_SGST',
-          discount: 0,
-          paidAmount: 0,
-          paymentTerms: 'Payment due within 15 days upon receipt',
-          items: [{ desc: 'FMCG Packaging Design & 3D Visualizer Sprint', sac: '998391', qty: 1, rate: 35000 }]
-        });
       };
 
-      // QUICK UPDATE PAYMENT / STATUS
       const handleUpdateInvoiceStatus = (invId, newStatus) => {
         setInvoices(invoices.map(inv => {
           if (inv.id !== invId) return inv;
@@ -366,11 +345,10 @@
         }));
       };
 
-      // MODAL SUBMIT HANDLERS
       const handleCreateClient = (e) => {
         e.preventDefault();
         if (!clientForm.name) return;
-        const newClient = {
+        setClients([...clients, {
           id: `CL-${Math.floor(100 + Math.random() * 900)}`,
           name: clientForm.name,
           contactPerson: clientForm.contactPerson || 'Authorized Rep',
@@ -381,89 +359,95 @@
           gstin: clientForm.gstin || '24AAAAA0000A1Z5',
           totalBilled: 0,
           outstanding: 0
-        };
-        setClients([...clients, newClient]);
+        }]);
         setActiveModal(null);
         setClientForm({ name: '', contactPerson: '', phone: '', email: '', industry: '', city: 'Ahmedabad', gstin: '' });
       };
 
-      const handleCreateLead = (e) => {
+      const handleCreateTeamMember = (e) => {
         e.preventDefault();
-        if (!leadForm.leadName) return;
-        const newLead = {
-          id: `LD-${Math.floor(100 + Math.random() * 900)}`,
-          leadName: leadForm.leadName,
-          companyName: leadForm.companyName || 'New Prospect',
-          phone: leadForm.phone || '+91 90000 00000',
-          email: leadForm.email || 'lead@mail.com',
-          service: leadForm.service,
-          budget: parseInt(leadForm.budget) || 50000,
-          stage: 'New'
-        };
-        setLeads([...leads, newLead]);
+        if (!teamForm.name) return;
+        setTeam([...team, {
+          id: `TM-${team.length + 1}`,
+          name: teamForm.name,
+          role: teamForm.role,
+          phone: teamForm.phone || '+91 90000 00000',
+          email: teamForm.email || 'team@triosept.com',
+          active: true
+        }]);
         setActiveModal(null);
-        setLeadForm({ leadName: '', companyName: '', phone: '', email: '', service: 'FMCG Packaging Design', budget: 50000 });
+        setTeamForm({ name: '', role: 'Packaging Designer', phone: '', email: '' });
       };
 
       const handleCreateProject = (e) => {
         e.preventDefault();
         if (!projectForm.title) return;
         const selectedCl = clients.find(c => c.id === projectForm.clientId) || clients[0];
-        const newProj = {
+        setProjects([...projects, {
           id: `PRJ-${Math.floor(100 + Math.random() * 900)}`,
           title: projectForm.title,
           clientId: selectedCl ? selectedCl.id : 'CL-101',
           clientName: selectedCl ? selectedCl.name : 'Vedic Pure Foods Pvt Ltd',
           budget: parseInt(projectForm.budget) || 50000,
           deadline: projectForm.deadline || new Date().toISOString().split('T')[0],
-          designer: projectForm.designer || 'Vikas Modi',
-          priority: projectForm.priority || 'High',
+          designer: projectForm.designer,
+          priority: projectForm.priority,
           status: 'In Progress',
           progress: 10
-        };
-        setProjects([...projects, newProj]);
+        }]);
         setActiveModal(null);
-        setProjectForm({ title: '', clientId: '', budget: 50000, deadline: '', designer: 'Vikas Modi', priority: 'High' });
+        setProjectForm({ title: '', clientId: '', budget: 50000, deadline: '', designer: team[0] ? team[0].name : 'Tanvi Joshi', priority: 'High' });
       };
 
       const handleCreateTask = (e) => {
         e.preventDefault();
         if (!taskForm.title || !selectedClientForView) return;
-        const newTask = {
+        setTasks([...tasks, {
           id: `TSK-${Math.floor(1000 + Math.random() * 9000)}`,
           clientId: selectedClientForView.id,
           title: taskForm.title,
-          assignedTo: taskForm.assignedTo || 'Design Team',
+          assignedTo: taskForm.assignedTo,
           dueDate: taskForm.dueDate || new Date().toISOString().split('T')[0],
-          priority: taskForm.priority || 'Medium',
+          priority: taskForm.priority,
           completed: false
-        };
-        setTasks([...tasks, newTask]);
+        }]);
         setActiveModal(null);
-        setTaskForm({ title: '', assignedTo: 'Design Team', dueDate: '', priority: 'Medium' });
+        setTaskForm({ title: '', assignedTo: team[0] ? team[0].name : 'Tanvi Joshi', dueDate: '', priority: 'Medium' });
       };
 
       const handleCreateExpense = (e) => {
         e.preventDefault();
         if (!expenseForm.title || !expenseForm.amount) return;
-        const newExpense = {
+        setExpenses([...expenses, {
           id: `EXP-${Math.floor(100 + Math.random() * 900)}`,
           title: expenseForm.title,
           category: expenseForm.category,
           amount: parseInt(expenseForm.amount) || 0,
           date: new Date().toISOString().split('T')[0],
           paymentMode: expenseForm.paymentMode
-        };
-        setExpenses([...expenses, newExpense]);
+        }]);
         setActiveModal(null);
         setExpenseForm({ title: '', category: 'Software Subscriptions', amount: '', paymentMode: 'UPI' });
       };
 
-      const handleUpdateProgress = (e) => {
-        e.preventDefault();
-        if (!progressModalData) return;
-        setProjects(projects.map(p => p.id === progressModalData.id ? { ...p, progress: parseInt(progressModalData.progress) || 0 } : p));
-        setProgressModalData(null);
+      // WHATSAPP QUICK SENDER
+      const generateWhatsAppText = () => {
+        if (waCustomMessage) return waCustomMessage;
+        if (waTemplate === 'update') {
+          return `Hello ${waRecipient.name || 'Sir/Ma\'am'},\n\nWe have updated your design progress at TRIOSEPT DESIGN STUDIO. Please check and let us know your feedback!\n\nBest Regards,\nTRIOSEPT DESIGN STUDIO`;
+        } else if (waTemplate === 'payment') {
+          return `Dear ${waRecipient.name || 'Client'},\n\nThis is a polite reminder regarding your pending invoice for creative branding services. Kindly clear the outstanding balance via UPI (${agency.upiId}) or Bank Transfer.\n\nThank you,\nTRIOSEPT DESIGN STUDIO`;
+        } else if (waTemplate === 'quote') {
+          return `Hello ${waRecipient.name || 'Client'},\n\nThank you for reaching out to TRIOSEPT DESIGN STUDIO. We have prepared your customized design proposal. Looking forward to partnering with your brand!\n\nRegards,\nTRIOSEPT DESIGN STUDIO`;
+        }
+        return `Hello from TRIOSEPT DESIGN STUDIO!`;
+      };
+
+      const openWhatsApp = () => {
+        const cleanPhone = (waRecipient.phone || '').replace(/[^0-9]/g, '');
+        const targetPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+        const msg = encodeURIComponent(generateWhatsAppText());
+        window.open(`https://wa.me/${targetPhone}?text=${msg}`, '_blank');
       };
 
       return (
@@ -481,7 +465,7 @@
                 )}
                 <div>
                   <h1 className="text-sm font-bold tracking-wider text-white">TRIOSEPT</h1>
-                  <p className="text-[10px] text-[#FF6A00] font-semibold tracking-widest uppercase">DESIGN STUDIO</p>
+                  <p className="text-[10px] text-[#FF6A00] font-semibold tracking-widest uppercase">BRANDING AGENCY</p>
                 </div>
               </div>
 
@@ -489,15 +473,21 @@
                 {[
                   { id: 'dashboard', label: 'Dashboard' },
                   { id: 'clients', label: 'Client 360 & Tasks' },
-                  { id: 'leads', label: 'Leads Pipeline' },
+                  { id: 'team', label: 'Creative Team & Assign' },
                   { id: 'projects', label: 'Projects' },
+                  { id: 'leads', label: 'Leads Pipeline' },
                   { id: 'finance', label: 'Invoices & Billing' },
+                  { id: 'whatsapp', label: 'WhatsApp Dispatcher' },
                   { id: 'reports', label: 'Revenue & Profit' },
                   { id: 'settings', label: 'Studio Settings' }
                 ].map((item) => (
                   <button
                     key={item.id}
-                    onClick={() => { setActiveTab(item.id); setSelectedClientForView(null); }}
+                    onClick={() => { 
+                      setActiveTab(item.id); 
+                      setSelectedClientForView(null);
+                      setSelectedTeamMemberForView(null);
+                    }}
                     className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
                       activeTab === item.id 
                         ? 'bg-[#FF6A00] text-white shadow-lg shadow-[#FF6A00]/20' 
@@ -526,8 +516,8 @@
                 <h2 className="text-xl font-bold capitalize text-white">
                   {activeTab === 'clients' && selectedClientForView 
                     ? `Client 360: ${selectedClientForView.name}`
-                    : activeTab === 'finance'
-                    ? 'Invoices, Accounts & Billing'
+                    : activeTab === 'team' && selectedTeamMemberForView
+                    ? `Team Member: ${selectedTeamMemberForView.name}`
                     : activeTab.replace('-', ' ')}
                 </h2>
                 <p className="text-xs text-slate-400 mt-1">TRIOSEPT Agency OS Management Suite</p>
@@ -560,21 +550,21 @@
                     <p className="text-[11px] text-slate-400 mt-1">Profit margin: {totalRevenue ? Math.round((netProfit/totalRevenue)*100) : 0}%</p>
                   </div>
                   <div className="p-5 bg-[#0F131D] border border-slate-800 rounded-xl">
-                    <p className="text-xs text-slate-400">Outstanding Receivables</p>
-                    <h3 className="text-2xl font-bold text-amber-400 mt-1">₹{totalOutstanding.toLocaleString('en-IN')}</h3>
-                    <p className="text-[11px] text-slate-400 mt-1">Pending payments</p>
+                    <p className="text-xs text-slate-400">Active Designers</p>
+                    <h3 className="text-2xl font-bold text-sky-400 mt-1">{team.length}</h3>
+                    <p className="text-[11px] text-slate-400 mt-1">{projects.length} Active Workspaces</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="p-5 bg-[#0F131D] border border-slate-800 rounded-xl">
-                    <h3 className="text-sm font-semibold text-white mb-4">Active Projects</h3>
+                    <h3 className="text-sm font-semibold text-white mb-4">Active Projects & Assigned Designers</h3>
                     <div className="space-y-3">
                       {projects.map((p) => (
                         <div key={p.id} className="p-3 bg-slate-900/60 rounded-lg border border-slate-800/80">
                           <div className="flex justify-between items-center text-xs">
                             <span className="font-medium text-slate-200">{p.title}</span>
-                            <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-400">{p.status}</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-semibold">{p.designer}</span>
                           </div>
                           <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
                             <div className="bg-[#FF6A00] h-full rounded-full" style={{ width: `${p.progress}%` }}></div>
@@ -600,10 +590,331 @@
                             />
                             <span className={t.completed ? 'line-through text-slate-500' : 'text-slate-300'}>{t.title}</span>
                           </div>
-                          <span className="text-[10px] text-slate-400">{t.dueDate}</span>
+                          <span className="text-[10px] text-amber-400 font-medium">({t.assignedTo})</span>
                         </div>
                       ))}
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* CREATIVE TEAM & WORKLOAD MODULE */}
+            {activeTab === 'team' && (
+              <div>
+                {!selectedTeamMemberForView ? (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="text-sm font-semibold text-white">Agency Creative Team</h3>
+                        <p className="text-xs text-slate-400">Assign projects, monitor designer load and inspect allocated deliverables</p>
+                      </div>
+                      <button 
+                        onClick={() => setActiveModal('newTeam')}
+                        className="px-3 py-1.5 bg-[#FF6A00] text-white text-xs font-semibold rounded-lg hover:bg-[#FF7A00]"
+                      >
+                        + Add Team Member
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {team.map((m) => {
+                        const assignedProjCount = projects.filter(p => p.designer === m.name).length;
+                        const assignedTaskCount = tasks.filter(t => t.assignedTo === m.name).length;
+                        return (
+                          <div key={m.id} className="p-5 bg-[#0F131D] border border-slate-800 rounded-xl space-y-3">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h4 className="font-bold text-white text-sm">{m.name}</h4>
+                                <p className="text-xs text-[#FF7A00] font-medium">{m.role}</p>
+                                <p className="text-[11px] text-slate-400 mt-1">{m.phone}</p>
+                              </div>
+                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" title="Active"></span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800 text-xs">
+                              <div className="p-2 bg-slate-900 rounded border border-slate-800">
+                                <span className="text-slate-400 text-[10px] block">Projects Assigned</span>
+                                <span className="font-bold text-white text-base">{assignedProjCount}</span>
+                              </div>
+                              <div className="p-2 bg-slate-900 rounded border border-slate-800">
+                                <span className="text-slate-400 text-[10px] block">Live Tasks</span>
+                                <span className="font-bold text-amber-400 text-base">{assignedTaskCount}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                              <button 
+                                onClick={() => setSelectedTeamMemberForView(m)}
+                                className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded text-xs text-center font-medium"
+                              >
+                                View Assigned Work →
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  if (confirm(`Remove ${m.name} from creative team?`)) {
+                                    setTeam(team.filter(item => item.id !== m.id));
+                                  }
+                                }}
+                                className="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded text-xs"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  /* DEDICATED MEMBER PROFILE VIEW */
+                  <div className="space-y-6">
+                    <button 
+                      onClick={() => setSelectedTeamMemberForView(null)}
+                      className="text-xs text-[#FF6A00] hover:underline"
+                    >
+                      ← Back to All Team Members
+                    </button>
+
+                    <div className="p-5 bg-[#0F131D] border border-slate-800 rounded-xl flex justify-between items-center">
+                      <div>
+                        <h3 className="text-lg font-bold text-white">{selectedTeamMemberForView.name}</h3>
+                        <p className="text-xs text-[#FF7A00] font-medium">{selectedTeamMemberForView.role}</p>
+                        <p className="text-xs text-slate-400 mt-1">Phone: {selectedTeamMemberForView.phone} | Email: {selectedTeamMemberForView.email}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs bg-sky-500/20 text-sky-300 font-semibold px-3 py-1 rounded-full">
+                          {projects.filter(p => p.designer === selectedTeamMemberForView.name).length} Workspaces Underway
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* ASSIGNED PROJECTS */}
+                    <div className="p-5 bg-[#0F131D] border border-slate-800 rounded-xl space-y-4">
+                      <h4 className="text-sm font-semibold text-white">Assigned Project Workspaces</h4>
+                      <div className="space-y-3">
+                        {projects.filter(p => p.designer === selectedTeamMemberForView.name).length === 0 ? (
+                          <p className="text-xs text-slate-500">No projects currently assigned to this designer.</p>
+                        ) : (
+                          projects.filter(p => p.designer === selectedTeamMemberForView.name).map(p => (
+                            <div key={p.id} className="p-3 bg-slate-900/60 border border-slate-800 rounded-lg text-xs space-y-2">
+                              <div className="flex justify-between items-center">
+                                <span className="font-bold text-slate-200">{p.title}</span>
+                                <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-300">Client: {p.clientName}</span>
+                              </div>
+                              <div className="flex justify-between text-[11px] text-slate-400">
+                                <span>Status: {p.status}</span>
+                                <span>Deadline: {p.deadline}</span>
+                                <span>Progress: {p.progress}%</span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    {/* ASSIGNED TASKS */}
+                    <div className="p-5 bg-[#0F131D] border border-slate-800 rounded-xl space-y-4">
+                      <h4 className="text-sm font-semibold text-white">Assigned Tasks & Checklist</h4>
+                      <div className="space-y-2">
+                        {tasks.filter(t => t.assignedTo === selectedTeamMemberForView.name).length === 0 ? (
+                          <p className="text-xs text-slate-500">No active tasks assigned to this team member.</p>
+                        ) : (
+                          tasks.filter(t => t.assignedTo === selectedTeamMemberForView.name).map(t => (
+                            <div key={t.id} className="flex items-center justify-between p-3 bg-slate-900/60 border border-slate-800 rounded-lg text-xs">
+                              <div className="flex items-center gap-3">
+                                <input 
+                                  type="checkbox" 
+                                  checked={t.completed} 
+                                  onChange={() => {
+                                    setTasks(tasks.map(item => item.id === t.id ? { ...item, completed: !item.completed } : item));
+                                  }}
+                                  className="accent-[#FF6A00]" 
+                                />
+                                <span className={t.completed ? 'line-through text-slate-500' : 'text-slate-200'}>{t.title}</span>
+                              </div>
+                              <span className="text-[10px] text-slate-400">{t.dueDate}</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* PROJECTS MODULE */}
+            {activeTab === 'projects' && (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <p className="text-xs text-slate-400">Creative Production Workspaces</p>
+                  <button 
+                    onClick={() => setActiveModal('newProject')}
+                    className="px-3 py-1.5 bg-[#FF6A00] text-white text-xs font-semibold rounded-lg"
+                  >
+                    + New Project
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {projects.map((p) => (
+                    <div key={p.id} className="p-5 bg-[#0F131D] border border-slate-800 rounded-xl space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="text-sm font-semibold text-white">{p.title}</h4>
+                          <p className="text-xs text-slate-400">{p.clientName}</p>
+                        </div>
+                        <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded">{p.priority}</span>
+                      </div>
+
+                      <div className="flex justify-between items-center text-xs text-slate-300">
+                        <span>Budget: ₹{p.budget.toLocaleString('en-IN')}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-500 text-[11px]">Designer:</span>
+                          <select 
+                            value={p.designer}
+                            onChange={(e) => {
+                              setProjects(projects.map(item => item.id === p.id ? { ...item, designer: e.target.value } : item));
+                            }}
+                            className="bg-slate-900 border border-slate-700 text-sky-400 font-semibold rounded px-2 py-0.5 text-xs"
+                          >
+                            {team.map(m => (
+                              <option key={m.id} value={m.name}>{m.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                          <span>Progress</span>
+                          <span>{p.progress}%</span>
+                        </div>
+                        <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                          <div className="bg-[#FF6A00] h-full" style={{ width: `${p.progress}%` }}></div>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between pt-2 border-t border-slate-800">
+                        <button 
+                          onClick={() => setProgressModalData({ id: p.id, title: p.title, progress: p.progress })}
+                          className="text-xs text-slate-300 hover:text-white"
+                        >
+                          Update Progress
+                        </button>
+                        <button 
+                          onClick={() => setProjects(projects.filter(item => item.id !== p.id))}
+                          className="text-xs text-rose-400"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* WHATSAPP MANAGEMENT MODULE */}
+            {activeTab === 'whatsapp' && (
+              <div className="space-y-6 max-w-3xl">
+                <div className="p-5 bg-[#0F131D] border border-slate-800 rounded-xl space-y-4">
+                  <div>
+                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                      <span className="text-emerald-400">●</span> WhatsApp Quick Message Dispatcher
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Directly trigger WhatsApp conversations with clients or prospects without typing repetitively.
+                    </p>
+                  </div>
+
+                  {/* Pick Contact */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Select Client or Prospect</label>
+                      <select 
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const foundCl = clients.find(c => c.id === val);
+                          const foundLd = leads.find(l => l.id === val);
+                          if (foundCl) {
+                            setWaRecipient({ phone: foundCl.phone, name: foundCl.contactPerson, type: 'client' });
+                          } else if (foundLd) {
+                            setWaRecipient({ phone: foundLd.phone, name: foundLd.leadName, type: 'lead' });
+                          }
+                        }}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200"
+                      >
+                        <option value="">-- Choose Contact --</option>
+                        <optgroup label="Clients">
+                          {clients.map(c => (
+                            <option key={c.id} value={c.id}>{c.name} ({c.contactPerson})</option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Leads">
+                          {leads.map(l => (
+                            <option key={l.id} value={l.id}>{l.companyName} ({l.leadName})</option>
+                          ))}
+                        </optgroup>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">WhatsApp Phone Number</label>
+                      <input 
+                        type="text" 
+                        value={waRecipient.phone}
+                        onChange={e => setWaRecipient({ ...waRecipient, phone: e.target.value })}
+                        placeholder="+91 96872 72246"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Template Selector */}
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Message Template</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: 'update', label: 'Design Update' },
+                        { id: 'payment', label: 'Payment Reminder' },
+                        { id: 'quote', label: 'Proposal Sent' }
+                      ].map(t => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => { setWaTemplate(t.id); setWaCustomMessage(''); }}
+                          className={`py-2 px-3 rounded-lg text-xs font-semibold border ${
+                            waTemplate === t.id 
+                              ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' 
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Message Preview & Editor */}
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Message Content (Preview / Custom Edit)</label>
+                    <textarea 
+                      rows="6"
+                      value={waCustomMessage || generateWhatsAppText()}
+                      onChange={e => setWaCustomMessage(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs text-slate-200 leading-relaxed font-mono"
+                    ></textarea>
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <button 
+                      onClick={openWhatsApp}
+                      className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-lg text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+                    >
+                      <span>💬</span> Open in WhatsApp & Send
+                    </button>
                   </div>
                 </div>
               </div>
@@ -618,7 +929,7 @@
                       <p className="text-xs text-slate-400">Total Clients: {clients.length}</p>
                       <button 
                         onClick={() => setActiveModal('newClient')}
-                        className="px-3 py-1.5 bg-[#FF6A00] text-white text-xs font-medium rounded-lg hover:bg-[#FF7A00]"
+                        className="px-3 py-1.5 bg-[#FF6A00] text-white text-xs font-semibold rounded-lg hover:bg-[#FF7A00]"
                       >
                         + Add Client
                       </button>
@@ -712,6 +1023,7 @@
                                 <span className={t.completed ? 'line-through text-slate-500' : 'text-slate-200'}>{t.title}</span>
                               </div>
                               <div className="flex items-center gap-3">
+                                <span className="text-[10px] text-sky-400 font-semibold">{t.assignedTo}</span>
                                 <span className="text-[10px] text-slate-400">{t.dueDate}</span>
                                 <button 
                                   onClick={() => setTasks(tasks.filter(item => item.id !== t.id))}
@@ -737,7 +1049,7 @@
                   <p className="text-xs text-slate-400">Sales Inquiries & Pipeline</p>
                   <button 
                     onClick={() => setActiveModal('newLead')}
-                    className="px-3 py-1.5 bg-[#FF6A00] text-white text-xs font-medium rounded-lg"
+                    className="px-3 py-1.5 bg-[#FF6A00] text-white text-xs font-semibold rounded-lg"
                   >
                     + Add Lead
                   </button>
@@ -805,121 +1117,50 @@
               </div>
             )}
 
-            {/* PROJECTS MODULE */}
-            {activeTab === 'projects' && (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <p className="text-xs text-slate-400">Creative Production Workspaces</p>
-                  <button 
-                    onClick={() => setActiveModal('newProject')}
-                    className="px-3 py-1.5 bg-[#FF6A00] text-white text-xs font-medium rounded-lg"
-                  >
-                    + New Project
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {projects.map((p) => (
-                    <div key={p.id} className="p-5 bg-[#0F131D] border border-slate-800 rounded-xl space-y-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="text-sm font-semibold text-white">{p.title}</h4>
-                          <p className="text-xs text-slate-400">{p.clientName}</p>
-                        </div>
-                        <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded">{p.priority}</span>
-                      </div>
-
-                      <div className="flex justify-between text-xs text-slate-300">
-                        <span>Budget: ₹{p.budget.toLocaleString('en-IN')}</span>
-                        <span>Deadline: {p.deadline}</span>
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between text-[11px] text-slate-400 mb-1">
-                          <span>Progress</span>
-                          <span>{p.progress}%</span>
-                        </div>
-                        <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                          <div className="bg-[#FF6A00] h-full" style={{ width: `${p.progress}%` }}></div>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-between pt-2 border-t border-slate-800">
-                        <button 
-                          onClick={() => setProgressModalData({ id: p.id, title: p.title, progress: p.progress })}
-                          className="text-xs text-slate-300 hover:text-white"
-                        >
-                          Update Progress
-                        </button>
-                        <button 
-                          onClick={() => setProjects(projects.filter(item => item.id !== p.id))}
-                          className="text-xs text-rose-400"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ==================== EXPANDED & ADVANCED INVOICES & BILLING MODULE ==================== */}
+            {/* INVOICES & BILLING MODULE */}
             {activeTab === 'finance' && (
               <div className="space-y-6">
-                {/* INVOICE SUMMARY KPI CARDS */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="p-4 bg-[#0F131D] border border-slate-800 rounded-xl">
                     <p className="text-xs text-slate-400">Total Invoiced (Gross)</p>
                     <h4 className="text-xl font-bold text-white mt-1">
                       ₹{invoices.reduce((a, b) => a + (b.amount || 0), 0).toLocaleString('en-IN')}
                     </h4>
-                    <p className="text-[10px] text-slate-500 mt-1">{invoices.length} Invoices generated</p>
                   </div>
                   <div className="p-4 bg-[#0F131D] border border-slate-800 rounded-xl">
                     <p className="text-xs text-slate-400">Total Collected</p>
                     <h4 className="text-xl font-bold text-emerald-400 mt-1">
                       ₹{totalRevenue.toLocaleString('en-IN')}
                     </h4>
-                    <p className="text-[10px] text-emerald-500 mt-1">Cleared in Bank / Cash</p>
                   </div>
                   <div className="p-4 bg-[#0F131D] border border-slate-800 rounded-xl">
                     <p className="text-xs text-slate-400">Pending Receivables</p>
                     <h4 className="text-xl font-bold text-amber-400 mt-1">
                       ₹{totalOutstanding.toLocaleString('en-IN')}
                     </h4>
-                    <p className="text-[10px] text-amber-500 mt-1">Unpaid / Partially Paid</p>
                   </div>
                   <div className="p-4 bg-[#0F131D] border border-slate-800 rounded-xl">
                     <p className="text-xs text-slate-400">Total GST Liability</p>
                     <h4 className="text-xl font-bold text-[#FF6A00] mt-1">
                       ₹{invoices.reduce((a, b) => a + (b.taxAmount || 0), 0).toLocaleString('en-IN')}
                     </h4>
-                    <p className="text-[10px] text-slate-500 mt-1">GSTR-1 output tax</p>
                   </div>
                 </div>
 
-                {/* INVOICE CONTROLS & TABLE */}
                 <div className="p-5 bg-[#0F131D] border border-slate-800 rounded-xl space-y-4">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-semibold text-white">Client Tax Invoices</h3>
-                      <span className="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-mono">
-                        {filteredInvoices.length}
-                      </span>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                      {/* Filter by Status */}
+                    <div className="flex flex-wrap items-center gap-2">
                       <div className="flex bg-slate-900 border border-slate-800 rounded-lg p-0.5 text-xs">
                         {['ALL', 'Paid', 'Partially Paid', 'Unpaid'].map((st) => (
                           <button
                             key={st}
                             onClick={() => setInvoiceFilterStatus(st)}
-                            className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
-                              invoiceFilterStatus === st 
-                                ? 'bg-[#FF6A00] text-white shadow' 
-                                : 'text-slate-400 hover:text-white'
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-medium ${
+                              invoiceFilterStatus === st ? 'bg-[#FF6A00] text-white shadow' : 'text-slate-400 hover:text-white'
                             }`}
                           >
                             {st}
@@ -929,109 +1170,74 @@
 
                       <button 
                         onClick={() => setActiveModal('newInvoice')}
-                        className="px-3 py-1.5 bg-[#FF6A00] hover:bg-[#FF7A00] text-white rounded-lg text-xs font-semibold shadow-md shadow-[#FF6A00]/20 flex items-center gap-1.5 ml-auto"
+                        className="px-3 py-1.5 bg-[#FF6A00] hover:bg-[#FF7A00] text-white rounded-lg text-xs font-semibold"
                       >
-                        <span>+</span> Create New Tax Invoice
+                        + Create Tax Invoice
                       </button>
                     </div>
                   </div>
 
-                  {/* TABLE OF INVOICES */}
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
                         <tr className="border-b border-slate-800 text-slate-400 bg-slate-900/40">
-                          <th className="py-2.5 px-3 font-semibold">Invoice No</th>
-                          <th className="py-2.5 px-3 font-semibold">Client Name</th>
-                          <th className="py-2.5 px-3 font-semibold">Issue Date</th>
-                          <th className="py-2.5 px-3 font-semibold">Due Date</th>
-                          <th className="py-2.5 px-3 font-semibold text-right">Taxable</th>
-                          <th className="py-2.5 px-3 font-semibold text-right">Total (Inc. GST)</th>
-                          <th className="py-2.5 px-3 font-semibold text-right">Balance Due</th>
-                          <th className="py-2.5 px-3 font-semibold text-center">Status</th>
-                          <th className="py-2.5 px-3 font-semibold text-right">Actions</th>
+                          <th className="py-2.5 px-3">Invoice No</th>
+                          <th className="py-2.5 px-3">Client</th>
+                          <th className="py-2.5 px-3">Date</th>
+                          <th className="py-2.5 px-3 text-right">Taxable</th>
+                          <th className="py-2.5 px-3 text-right">Total</th>
+                          <th className="py-2.5 px-3 text-right">Balance</th>
+                          <th className="py-2.5 px-3 text-center">Status</th>
+                          <th className="py-2.5 px-3 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/60">
-                        {filteredInvoices.length === 0 ? (
-                          <tr>
-                            <td colSpan="9" className="py-6 text-center text-slate-500">
-                              No invoices found matching current filter.
+                        {filteredInvoices.map((inv) => (
+                          <tr key={inv.id} className="hover:bg-slate-900/40">
+                            <td className="py-3 px-3 font-mono font-bold text-[#FF7A00]">{inv.id}</td>
+                            <td className="py-3 px-3 text-slate-200 font-medium">{inv.clientName}</td>
+                            <td className="py-3 px-3 text-slate-400">{inv.date}</td>
+                            <td className="py-3 px-3 text-right text-slate-300">₹{(inv.subtotal || 0).toLocaleString('en-IN')}</td>
+                            <td className="py-3 px-3 text-right font-bold text-white">₹{inv.amount.toLocaleString('en-IN')}</td>
+                            <td className="py-3 px-3 text-right font-bold text-amber-400">
+                              ₹{Math.max(0, inv.amount - (inv.paidAmount || 0)).toLocaleString('en-IN')}
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              <select
+                                value={inv.status}
+                                onChange={(e) => handleUpdateInvoiceStatus(inv.id, e.target.value)}
+                                className="text-[10px] font-semibold px-2 py-1 rounded bg-slate-900 border border-slate-700 text-slate-300"
+                              >
+                                <option value="Paid">Paid</option>
+                                <option value="Partially Paid">Partially Paid</option>
+                                <option value="Unpaid">Unpaid</option>
+                                <option value="Overdue">Overdue</option>
+                              </select>
+                            </td>
+                            <td className="py-3 px-3 text-right space-x-2">
+                              <button 
+                                onClick={() => setPrintInvoiceData(inv)}
+                                className="px-2 py-1 bg-slate-800 text-slate-200 hover:bg-slate-700 rounded text-[11px]"
+                              >
+                                Print / PDF
+                              </button>
+                              <button 
+                                onClick={() => setInvoices(invoices.filter(item => item.id !== inv.id))}
+                                className="px-2 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded text-[11px]"
+                              >
+                                ✕
+                              </button>
                             </td>
                           </tr>
-                        ) : (
-                          filteredInvoices.map((inv) => {
-                            const balance = Math.max(0, inv.amount - (inv.paidAmount || 0));
-                            return (
-                              <tr key={inv.id} className="hover:bg-slate-900/40 transition-colors">
-                                <td className="py-3 px-3 font-mono font-bold text-[#FF7A00]">{inv.id}</td>
-                                <td className="py-3 px-3">
-                                  <p className="font-semibold text-slate-200">{inv.clientName}</p>
-                                  <p className="text-[10px] text-slate-500">{inv.clientGstin || 'No GSTIN'}</p>
-                                </td>
-                                <td className="py-3 px-3 text-slate-300">{inv.date}</td>
-                                <td className="py-3 px-3 text-slate-400">{inv.dueDate}</td>
-                                <td className="py-3 px-3 text-right text-slate-300">₹{(inv.subtotal || (inv.amount / 1.18)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
-                                <td className="py-3 px-3 text-right font-bold text-slate-100">₹{inv.amount.toLocaleString('en-IN')}</td>
-                                <td className="py-3 px-3 text-right font-bold">
-                                  {balance > 0 ? (
-                                    <span className="text-amber-400">₹{balance.toLocaleString('en-IN')}</span>
-                                  ) : (
-                                    <span className="text-slate-500">₹0</span>
-                                  )}
-                                </td>
-                                <td className="py-3 px-3 text-center">
-                                  <select
-                                    value={inv.status}
-                                    onChange={(e) => handleUpdateInvoiceStatus(inv.id, e.target.value)}
-                                    className={`text-[10px] font-semibold px-2 py-1 rounded-md border border-slate-700 bg-slate-900 focus:outline-none cursor-pointer ${
-                                      inv.status === 'Paid' 
-                                        ? 'text-emerald-400 border-emerald-500/30' 
-                                        : inv.status === 'Partially Paid' 
-                                        ? 'text-sky-400 border-sky-500/30' 
-                                        : 'text-amber-400 border-amber-500/30'
-                                    }`}
-                                  >
-                                    <option value="Paid">Paid</option>
-                                    <option value="Partially Paid">Partially Paid</option>
-                                    <option value="Unpaid">Unpaid</option>
-                                    <option value="Overdue">Overdue</option>
-                                  </select>
-                                </td>
-                                <td className="py-3 px-3 text-right space-x-2">
-                                  <button 
-                                    onClick={() => setPrintInvoiceData(inv)}
-                                    className="px-2.5 py-1 bg-slate-800 text-slate-200 hover:bg-slate-700 rounded text-[11px] font-medium"
-                                  >
-                                    Print / PDF
-                                  </button>
-                                  <button 
-                                    onClick={() => {
-                                      if (confirm(`Delete Invoice ${inv.id}?`)) {
-                                        setInvoices(invoices.filter(item => item.id !== inv.id));
-                                      }
-                                    }}
-                                    className="px-2 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded text-[11px]"
-                                  >
-                                    ✕
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
+                        ))}
                       </tbody>
                     </table>
                   </div>
                 </div>
 
-                {/* STUDIO EXPENSES SECTION */}
                 <div className="p-5 bg-[#0F131D] border border-slate-800 rounded-xl space-y-4">
                   <div className="flex justify-between items-center">
-                    <div>
-                      <h3 className="text-sm font-semibold text-white">Studio Operating Expenses</h3>
-                      <p className="text-[11px] text-slate-400 mt-0.5">Deducted from gross billing for true profit calculation</p>
-                    </div>
+                    <h3 className="text-sm font-semibold text-white">Studio Operating Expenses</h3>
                     <button 
                       onClick={() => setActiveModal('newExpense')}
                       className="px-2.5 py-1 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-xs font-semibold"
@@ -1045,7 +1251,7 @@
                       <div key={exp.id} className="flex items-center justify-between p-3 bg-slate-900/60 border border-slate-800 rounded-lg text-xs">
                         <div>
                           <p className="font-medium text-slate-200">{exp.title}</p>
-                          <p className="text-[11px] text-slate-400">{exp.category} • {exp.date} • Mode: {exp.paymentMode}</p>
+                          <p className="text-[11px] text-slate-400">{exp.category} • {exp.date}</p>
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="font-semibold text-rose-400">₹{exp.amount.toLocaleString('en-IN')}</span>
@@ -1194,414 +1400,69 @@
             )}
           </main>
 
-          {/* ==================== SYSTEM INTEGRATED DIALOGUES / MODALS ==================== */}
+          {/* ==================== SYSTEM DIALOGUES / MODALS ==================== */}
 
-          {/* NEW EXPANDED TAX INVOICE BUILDER MODAL */}
-          {activeModal === 'newInvoice' && (
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-              <div className="bg-[#0F131D] border border-slate-800 w-full max-w-2xl rounded-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-                <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-800">
-                  <div>
-                    <h3 className="text-base font-bold text-white">Create Professional Tax Invoice</h3>
-                    <p className="text-xs text-slate-400">Configure client, multi-line items, SAC code & GST breakdown</p>
-                  </div>
-                  <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-white">✕</button>
-                </div>
-
-                <form onSubmit={handleCreateInvoice} className="space-y-4 text-xs">
-                  {/* Client Selector & Basic Details */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-slate-900/60 rounded-xl border border-slate-800">
-                    <div>
-                      <label className="block text-slate-400 mb-1">Choose Existing Client</label>
-                      <select 
-                        value={invoiceForm.clientId}
-                        onChange={(e) => handleSelectClientForInvoice(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-[#FF6A00]"
-                      >
-                        <option value="">-- Custom / Direct Client --</option>
-                        {clients.map(c => (
-                          <option key={c.id} value={c.id}>{c.name} ({c.city})</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 mb-1">Client Business Name *</label>
-                      <input 
-                        type="text" required 
-                        value={invoiceForm.clientName} 
-                        onChange={e => setInvoiceForm({ ...invoiceForm, clientName: e.target.value })} 
-                        placeholder="Company Name"
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 mb-1">Client GSTIN</label>
-                      <input 
-                        type="text" 
-                        value={invoiceForm.clientGstin} 
-                        onChange={e => setInvoiceForm({ ...invoiceForm, clientGstin: e.target.value })} 
-                        placeholder="24AAACV1234F1Z8"
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 mb-1">Client Address</label>
-                      <input 
-                        type="text" 
-                        value={invoiceForm.clientAddress} 
-                        onChange={e => setInvoiceForm({ ...invoiceForm, clientAddress: e.target.value })} 
-                        placeholder="Ahmedabad, Gujarat"
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
-                      />
-                    </div>
-                  </div>
-
-                  {/* Date & Tax Configuration */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-slate-400 mb-1">Invoice Date</label>
-                      <input 
-                        type="date" 
-                        value={invoiceForm.date} 
-                        onChange={e => setInvoiceForm({ ...invoiceForm, date: e.target.value })} 
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 mb-1">Due Date</label>
-                      <input 
-                        type="date" 
-                        value={invoiceForm.dueDate} 
-                        onChange={e => setInvoiceForm({ ...invoiceForm, dueDate: e.target.value })} 
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 mb-1">GST Tax Type</label>
-                      <select 
-                        value={invoiceForm.taxType}
-                        onChange={e => setInvoiceForm({ ...invoiceForm, taxType: e.target.value })}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-[#FF6A00]"
-                      >
-                        <option value="CGST_SGST">CGST (9%) + SGST (9%) [Gujarat]</option>
-                        <option value="IGST">IGST (18%) [Out of State]</option>
-                        <option value="NONE">Non-GST / Exempt (0%)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Dynamic Line Items */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <label className="block font-semibold text-slate-300">Invoice Line Items & Services</label>
-                      <button 
-                        type="button" 
-                        onClick={addInvoiceItem}
-                        className="text-[11px] text-[#FF7A00] hover:underline"
-                      >
-                        + Add Another Service Line
-                      </button>
-                    </div>
-
-                    <div className="space-y-2">
-                      {invoiceForm.items.map((item, idx) => (
-                        <div key={idx} className="flex items-center gap-2 bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
-                          <input 
-                            type="text" 
-                            required 
-                            placeholder="Service Description (e.g., FMCG Box Packaging Design)"
-                            value={item.desc}
-                            onChange={e => updateInvoiceItem(idx, 'desc', e.target.value)}
-                            className="flex-1 bg-slate-800 border border-slate-700 rounded p-1.5 text-slate-200"
-                          />
-                          <input 
-                            type="text" 
-                            placeholder="SAC"
-                            value={item.sac}
-                            onChange={e => updateInvoiceItem(idx, 'sac', e.target.value)}
-                            className="w-16 bg-slate-800 border border-slate-700 rounded p-1.5 text-center text-slate-300"
-                          />
-                          <input 
-                            type="number" 
-                            placeholder="Qty"
-                            min="1"
-                            value={item.qty}
-                            onChange={e => updateInvoiceItem(idx, 'qty', e.target.value)}
-                            className="w-14 bg-slate-800 border border-slate-700 rounded p-1.5 text-center text-slate-200"
-                          />
-                          <input 
-                            type="number" 
-                            placeholder="Rate (₹)"
-                            value={item.rate}
-                            onChange={e => updateInvoiceItem(idx, 'rate', e.target.value)}
-                            className="w-24 bg-slate-800 border border-slate-700 rounded p-1.5 text-right text-slate-200"
-                          />
-                          <span className="w-20 text-right font-mono text-slate-300 text-[11px]">
-                            ₹{((parseInt(item.qty) || 1) * (parseFloat(item.rate) || 0)).toLocaleString('en-IN')}
-                          </span>
-                          {invoiceForm.items.length > 1 && (
-                            <button 
-                              type="button" 
-                              onClick={() => removeInvoiceItem(idx)}
-                              className="text-rose-400 hover:text-rose-300 px-1"
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Financial Settlement: Discount & Advance Received */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-                    <div>
-                      <label className="block text-slate-400 mb-1">Discount (₹)</label>
-                      <input 
-                        type="number" 
-                        value={invoiceForm.discount} 
-                        onChange={e => setInvoiceForm({ ...invoiceForm, discount: e.target.value })} 
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 mb-1">Advance Amount Received (₹)</label>
-                      <input 
-                        type="number" 
-                        value={invoiceForm.paidAmount} 
-                        onChange={e => setInvoiceForm({ ...invoiceForm, paidAmount: e.target.value })} 
-                        placeholder="0"
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-emerald-400 font-bold" 
-                      />
-                    </div>
-                  </div>
-
-                  {/* Payment Terms */}
-                  <div>
-                    <label className="block text-slate-400 mb-1">Payment Terms & Notes</label>
-                    <input 
-                      type="text" 
-                      value={invoiceForm.paymentTerms} 
-                      onChange={e => setInvoiceForm({ ...invoiceForm, paymentTerms: e.target.value })} 
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200" 
-                    />
-                  </div>
-
-                  {/* Real-time Tax & Total Preview */}
-                  <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 text-xs space-y-1">
-                    <div className="flex justify-between text-slate-400">
-                      <span>Subtotal:</span>
-                      <span>₹{invoiceCalculations.subtotal.toLocaleString('en-IN')}</span>
-                    </div>
-                    {invoiceForm.discount > 0 && (
-                      <div className="flex justify-between text-rose-400">
-                        <span>Discount:</span>
-                        <span>- ₹{parseFloat(invoiceForm.discount).toLocaleString('en-IN')}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-slate-400">
-                      <span>GST ({invoiceForm.taxType === 'NONE' ? '0%' : '18%'}):</span>
-                      <span>₹{invoiceCalculations.taxAmount.toLocaleString('en-IN')}</span>
-                    </div>
-                    <div className="flex justify-between font-bold text-white text-sm pt-1 border-t border-slate-800">
-                      <span>Grand Total:</span>
-                      <span className="text-[#FF7A00]">₹{invoiceCalculations.grandTotal.toLocaleString('en-IN')}</span>
-                    </div>
-                    <div className="flex justify-between font-semibold text-xs pt-1 text-amber-400">
-                      <span>Balance Outstanding Due:</span>
-                      <span>₹{invoiceCalculations.balanceDue.toLocaleString('en-IN')}</span>
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
-                    <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg">Cancel</button>
-                    <button type="submit" className="px-5 py-2 bg-[#FF6A00] text-white font-medium rounded-lg hover:bg-[#FF7A00]">Save & Generate Invoice</button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* ADD CLIENT MODAL */}
-          {activeModal === 'newClient' && (
+          {/* ADD TEAM MEMBER MODAL */}
+          {activeModal === 'newTeam' && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
               <div className="bg-[#0F131D] border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
                 <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-800">
-                  <h3 className="text-base font-bold text-white">Add New Client</h3>
+                  <h3 className="text-base font-bold text-white">Add Creative Team Member</h3>
                   <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-white">✕</button>
                 </div>
-                <form onSubmit={handleCreateClient} className="space-y-3 text-xs">
+                <form onSubmit={handleCreateTeamMember} className="space-y-3 text-xs">
                   <div>
-                    <label className="block text-slate-400 mb-1">Company Name *</label>
+                    <label className="block text-slate-400 mb-1">Full Name *</label>
                     <input 
                       type="text" required 
-                      value={clientForm.name} 
-                      onChange={e => setClientForm({ ...clientForm, name: e.target.value })} 
-                      placeholder="e.g. Acme Brands Pvt Ltd"
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-slate-400 mb-1">Contact Person</label>
-                      <input 
-                        type="text" 
-                        value={clientForm.contactPerson} 
-                        onChange={e => setClientForm({ ...clientForm, contactPerson: e.target.value })} 
-                        placeholder="e.g. Ramesh Patel"
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 mb-1">Phone Number</label>
-                      <input 
-                        type="text" 
-                        value={clientForm.phone} 
-                        onChange={e => setClientForm({ ...clientForm, phone: e.target.value })} 
-                        placeholder="+91 98765 43210"
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-slate-400 mb-1">Email Address</label>
-                      <input 
-                        type="email" 
-                        value={clientForm.email} 
-                        onChange={e => setClientForm({ ...clientForm, email: e.target.value })} 
-                        placeholder="client@mail.com"
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 mb-1">City</label>
-                      <input 
-                        type="text" 
-                        value={clientForm.city} 
-                        onChange={e => setClientForm({ ...clientForm, city: e.target.value })} 
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-slate-400 mb-1">Industry</label>
-                      <input 
-                        type="text" 
-                        value={clientForm.industry} 
-                        onChange={e => setClientForm({ ...clientForm, industry: e.target.value })} 
-                        placeholder="FMCG / Retail / Corporate"
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 mb-1">GSTIN</label>
-                      <input 
-                        type="text" 
-                        value={clientForm.gstin} 
-                        onChange={e => setClientForm({ ...clientForm, gstin: e.target.value })} 
-                        placeholder="24AAAAA0000A1Z5"
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
-                      />
-                    </div>
-                  </div>
-                  <div className="flex justify-end gap-2 pt-3 border-t border-slate-800 mt-4">
-                    <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg">Cancel</button>
-                    <button type="submit" className="px-5 py-2 bg-[#FF6A00] text-white font-medium rounded-lg hover:bg-[#FF7A00]">Save Client</button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* ADD LEAD MODAL */}
-          {activeModal === 'newLead' && (
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-              <div className="bg-[#0F131D] border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
-                <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-800">
-                  <h3 className="text-base font-bold text-white">Add New Lead</h3>
-                  <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-white">✕</button>
-                </div>
-                <form onSubmit={handleCreateLead} className="space-y-3 text-xs">
-                  <div>
-                    <label className="block text-slate-400 mb-1">Contact Person Name *</label>
-                    <input 
-                      type="text" required 
-                      value={leadForm.leadName} 
-                      onChange={e => setLeadForm({ ...leadForm, leadName: e.target.value })} 
-                      placeholder="e.g. Nirav Dave"
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                      value={teamForm.name} 
+                      onChange={e => setTeamForm({ ...teamForm, name: e.target.value })} 
+                      placeholder="e.g. Rahul Verma"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200" 
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">Company / Brand Name</label>
+                    <label className="block text-slate-400 mb-1">Designation / Role</label>
                     <input 
                       type="text" 
-                      value={leadForm.companyName} 
-                      onChange={e => setLeadForm({ ...leadForm, companyName: e.target.value })} 
-                      placeholder="e.g. Dave Sweets & Farsan"
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                      value={teamForm.role} 
+                      onChange={e => setTeamForm({ ...teamForm, role: e.target.value })} 
+                      placeholder="e.g. 3D Packaging Visualizer"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200" 
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-slate-400 mb-1">Phone</label>
+                      <label className="block text-slate-400 mb-1">Mobile</label>
                       <input 
                         type="text" 
-                        value={leadForm.phone} 
-                        onChange={e => setLeadForm({ ...leadForm, phone: e.target.value })} 
-                        placeholder="+91 98980 00000"
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                        value={teamForm.phone} 
+                        onChange={e => setTeamForm({ ...teamForm, phone: e.target.value })} 
+                        placeholder="+91 98000 00000"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200" 
                       />
                     </div>
                     <div>
                       <label className="block text-slate-400 mb-1">Email</label>
                       <input 
                         type="email" 
-                        value={leadForm.email} 
-                        onChange={e => setLeadForm({ ...leadForm, email: e.target.value })} 
-                        placeholder="lead@brand.com"
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-slate-400 mb-1">Service Required</label>
-                      <select 
-                        value={leadForm.service}
-                        onChange={e => setLeadForm({ ...leadForm, service: e.target.value })}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]"
-                      >
-                        <option value="Logo Design & Identity">Logo Design & Identity</option>
-                        <option value="Complete Branding">Complete Branding</option>
-                        <option value="FMCG Packaging Design">FMCG Packaging Design</option>
-                        <option value="Social Media Creatives">Social Media Creatives</option>
-                        <option value="Brochure & Catalogue">Brochure & Catalogue</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 mb-1">Estimated Budget (₹)</label>
-                      <input 
-                        type="number" 
-                        value={leadForm.budget} 
-                        onChange={e => setLeadForm({ ...leadForm, budget: e.target.value })} 
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                        value={teamForm.email} 
+                        onChange={e => setTeamForm({ ...teamForm, email: e.target.value })} 
+                        placeholder="designer@triosept.com"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200" 
                       />
                     </div>
                   </div>
                   <div className="flex justify-end gap-2 pt-3 border-t border-slate-800 mt-4">
                     <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg">Cancel</button>
-                    <button type="submit" className="px-5 py-2 bg-[#FF6A00] text-white font-medium rounded-lg hover:bg-[#FF7A00]">Save Lead</button>
+                    <button type="submit" className="px-5 py-2 bg-[#FF6A00] text-white font-medium rounded-lg hover:bg-[#FF7A00]">Save Member</button>
                   </div>
                 </form>
               </div>
             </div>
           )}
 
-          {/* ADD PROJECT MODAL */}
+          {/* ADD PROJECT MODAL WITH TEAM ASSIGNMENT */}
           {activeModal === 'newProject' && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
               <div className="bg-[#0F131D] border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
@@ -1617,7 +1478,7 @@
                       value={projectForm.title} 
                       onChange={e => setProjectForm({ ...projectForm, title: e.target.value })} 
                       placeholder="e.g. FMCG Box & Label 3D Visuals"
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200" 
                     />
                   </div>
                   <div>
@@ -1625,7 +1486,7 @@
                     <select 
                       value={projectForm.clientId}
                       onChange={e => setProjectForm({ ...projectForm, clientId: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200"
                     >
                       {clients.map(c => (
                         <option key={c.id} value={c.id}>{c.name}</option>
@@ -1634,12 +1495,12 @@
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-slate-400 mb-1">Project Budget (₹)</label>
+                      <label className="block text-slate-400 mb-1">Budget (₹)</label>
                       <input 
                         type="number" 
                         value={projectForm.budget} 
                         onChange={e => setProjectForm({ ...projectForm, budget: e.target.value })} 
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200" 
                       />
                     </div>
                     <div>
@@ -1648,26 +1509,29 @@
                         type="date" 
                         value={projectForm.deadline} 
                         onChange={e => setProjectForm({ ...projectForm, deadline: e.target.value })} 
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200" 
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-slate-400 mb-1">Lead Designer</label>
-                      <input 
-                        type="text" 
-                        value={projectForm.designer} 
-                        onChange={e => setProjectForm({ ...projectForm, designer: e.target.value })} 
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
-                      />
+                      <label className="block text-slate-400 mb-1">Assign Creative Designer *</label>
+                      <select 
+                        value={projectForm.designer}
+                        onChange={e => setProjectForm({ ...projectForm, designer: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-sky-400 font-semibold"
+                      >
+                        {team.map(m => (
+                          <option key={m.id} value={m.name}>{m.name} ({m.role})</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-slate-400 mb-1">Priority</label>
                       <select 
                         value={projectForm.priority}
                         onChange={e => setProjectForm({ ...projectForm, priority: e.target.value })}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200"
                       >
                         <option value="Low">Low</option>
                         <option value="Medium">Medium</option>
@@ -1685,7 +1549,132 @@
             </div>
           )}
 
-          {/* ADD TASK MODAL (CLIENT 360) */}
+          {/* CREATE INVOICE MODAL */}
+          {activeModal === 'newInvoice' && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div className="bg-[#0F131D] border border-slate-800 w-full max-w-2xl rounded-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-800">
+                  <h3 className="text-base font-bold text-white">Create Professional Tax Invoice</h3>
+                  <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-white">✕</button>
+                </div>
+
+                <form onSubmit={handleCreateInvoice} className="space-y-4 text-xs">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-slate-900/60 rounded-xl border border-slate-800">
+                    <div>
+                      <label className="block text-slate-400 mb-1">Choose Client</label>
+                      <select 
+                        value={invoiceForm.clientId}
+                        onChange={(e) => handleSelectClientForInvoice(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200"
+                      >
+                        <option value="">-- Custom Client --</option>
+                        {clients.map(c => (
+                          <option key={c.id} value={c.id}>{c.name} ({c.city})</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 mb-1">Client Business Name *</label>
+                      <input 
+                        type="text" required 
+                        value={invoiceForm.clientName} 
+                        onChange={e => setInvoiceForm({ ...invoiceForm, clientName: e.target.value })} 
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="block font-semibold text-slate-300">Invoice Items</label>
+                      <button type="button" onClick={addInvoiceItem} className="text-[11px] text-[#FF7A00] hover:underline">+ Add Line</button>
+                    </div>
+
+                    {invoiceForm.items.map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-2 bg-slate-900/80 p-2 rounded-lg border border-slate-800">
+                        <input 
+                          type="text" required placeholder="Service Description"
+                          value={item.desc} onChange={e => updateInvoiceItem(idx, 'desc', e.target.value)}
+                          className="flex-1 bg-slate-800 border border-slate-700 rounded p-1.5 text-slate-200"
+                        />
+                        <input 
+                          type="number" placeholder="Qty" min="1"
+                          value={item.qty} onChange={e => updateInvoiceItem(idx, 'qty', e.target.value)}
+                          className="w-14 bg-slate-800 border border-slate-700 rounded p-1.5 text-center text-slate-200"
+                        />
+                        <input 
+                          type="number" placeholder="Rate (₹)"
+                          value={item.rate} onChange={e => updateInvoiceItem(idx, 'rate', e.target.value)}
+                          className="w-24 bg-slate-800 border border-slate-700 rounded p-1.5 text-right text-slate-200"
+                        />
+                        {invoiceForm.items.length > 1 && (
+                          <button type="button" onClick={() => removeInvoiceItem(idx)} className="text-rose-400 px-1">✕</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-400 mb-1">Discount (₹)</label>
+                      <input 
+                        type="number" value={invoiceForm.discount} 
+                        onChange={e => setInvoiceForm({ ...invoiceForm, discount: e.target.value })} 
+                        className="w-full bg-slate-900 border border-slate-800 rounded p-2 text-slate-200" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 mb-1">Advance Received (₹)</label>
+                      <input 
+                        type="number" value={invoiceForm.paidAmount} 
+                        onChange={e => setInvoiceForm({ ...invoiceForm, paidAmount: e.target.value })} 
+                        className="w-full bg-slate-900 border border-slate-800 rounded p-2 text-emerald-400 font-bold" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                    <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg">Cancel</button>
+                    <button type="submit" className="px-5 py-2 bg-[#FF6A00] text-white font-medium rounded-lg hover:bg-[#FF7A00]">Save & Generate</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ADD CLIENT MODAL */}
+          {activeModal === 'newClient' && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div className="bg-[#0F131D] border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
+                <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-800">
+                  <h3 className="text-base font-bold text-white">Add New Client</h3>
+                  <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-white">✕</button>
+                </div>
+                <form onSubmit={handleCreateClient} className="space-y-3 text-xs">
+                  <div>
+                    <label className="block text-slate-400 mb-1">Company Name *</label>
+                    <input type="text" required value={clientForm.name} onChange={e => setClientForm({ ...clientForm, name: e.target.value })} className="w-full bg-slate-900 border border-slate-800 rounded p-2 text-slate-200" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-400 mb-1">Contact Person</label>
+                      <input type="text" value={clientForm.contactPerson} onChange={e => setClientForm({ ...clientForm, contactPerson: e.target.value })} className="w-full bg-slate-900 border border-slate-800 rounded p-2 text-slate-200" />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 mb-1">Phone</label>
+                      <input type="text" value={clientForm.phone} onChange={e => setClientForm({ ...clientForm, phone: e.target.value })} className="w-full bg-slate-900 border border-slate-800 rounded p-2 text-slate-200" />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-3 border-t border-slate-800 mt-4">
+                    <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg">Cancel</button>
+                    <button type="submit" className="px-5 py-2 bg-[#FF6A00] text-white font-medium rounded-lg">Save Client</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ADD TASK MODAL (CLIENT 360) WITH TEAM SELECTOR */}
           {activeModal === 'newTask' && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
               <div className="bg-[#0F131D] border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
@@ -1696,37 +1685,29 @@
                 <form onSubmit={handleCreateTask} className="space-y-3 text-xs">
                   <div>
                     <label className="block text-slate-400 mb-1">Task Title *</label>
-                    <input 
-                      type="text" required 
-                      value={taskForm.title} 
-                      onChange={e => setTaskForm({ ...taskForm, title: e.target.value })} 
-                      placeholder="e.g. Export Print Ready CMYK Vector Dielines"
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
-                    />
+                    <input type="text" required value={taskForm.title} onChange={e => setTaskForm({ ...taskForm, title: e.target.value })} className="w-full bg-slate-900 border border-slate-800 rounded p-2 text-slate-200" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-slate-400 mb-1">Assigned Designer</label>
-                      <input 
-                        type="text" 
-                        value={taskForm.assignedTo} 
-                        onChange={e => setTaskForm({ ...taskForm, assignedTo: e.target.value })} 
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
-                      />
+                      <label className="block text-slate-400 mb-1">Assign Team Member</label>
+                      <select 
+                        value={taskForm.assignedTo}
+                        onChange={e => setTaskForm({ ...taskForm, assignedTo: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-800 rounded p-2 text-sky-400 font-semibold"
+                      >
+                        {team.map(m => (
+                          <option key={m.id} value={m.name}>{m.name}</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-slate-400 mb-1">Due Date</label>
-                      <input 
-                        type="date" 
-                        value={taskForm.dueDate} 
-                        onChange={e => setTaskForm({ ...taskForm, dueDate: e.target.value })} 
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
-                      />
+                      <input type="date" value={taskForm.dueDate} onChange={e => setTaskForm({ ...taskForm, dueDate: e.target.value })} className="w-full bg-slate-900 border border-slate-800 rounded p-2 text-slate-200" />
                     </div>
                   </div>
                   <div className="flex justify-end gap-2 pt-3 border-t border-slate-800 mt-4">
                     <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg">Cancel</button>
-                    <button type="submit" className="px-5 py-2 bg-[#FF6A00] text-white font-medium rounded-lg hover:bg-[#FF7A00]">Add Task</button>
+                    <button type="submit" className="px-5 py-2 bg-[#FF6A00] text-white font-medium rounded-lg">Add Task</button>
                   </div>
                 </form>
               </div>
@@ -1743,57 +1724,27 @@
                 </div>
                 <form onSubmit={handleCreateExpense} className="space-y-3 text-xs">
                   <div>
-                    <label className="block text-slate-400 mb-1">Expense Description *</label>
-                    <input 
-                      type="text" required 
-                      value={expenseForm.title} 
-                      onChange={e => setExpenseForm({ ...expenseForm, title: e.target.value })} 
-                      placeholder="e.g. Adobe Suite Monthly License"
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
-                    />
+                    <label className="block text-slate-400 mb-1">Description *</label>
+                    <input type="text" required value={expenseForm.title} onChange={e => setExpenseForm({ ...expenseForm, title: e.target.value })} className="w-full bg-slate-900 border border-slate-800 rounded p-2 text-slate-200" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-slate-400 mb-1">Expense Category</label>
-                      <select 
-                        value={expenseForm.category}
-                        onChange={e => setExpenseForm({ ...expenseForm, category: e.target.value })}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]"
-                      >
+                      <label className="block text-slate-400 mb-1">Category</label>
+                      <select value={expenseForm.category} onChange={e => setExpenseForm({ ...expenseForm, category: e.target.value })} className="w-full bg-slate-900 border border-slate-800 rounded p-2 text-slate-200">
                         <option value="Software Subscriptions">Software Subscriptions</option>
                         <option value="Hardware Expenses">Hardware Expenses</option>
                         <option value="Printing Expenses">Printing Expenses</option>
                         <option value="Freelancer Payments">Freelancer Payments</option>
-                        <option value="Office & Tea Expenses">Office & Tea Expenses</option>
                       </select>
                     </div>
                     <div>
                       <label className="block text-slate-400 mb-1">Amount (₹) *</label>
-                      <input 
-                        type="number" required 
-                        value={expenseForm.amount} 
-                        onChange={e => setExpenseForm({ ...expenseForm, amount: e.target.value })} 
-                        placeholder="5000"
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
-                      />
+                      <input type="number" required value={expenseForm.amount} onChange={e => setExpenseForm({ ...expenseForm, amount: e.target.value })} className="w-full bg-slate-900 border border-slate-800 rounded p-2 text-slate-200" />
                     </div>
-                  </div>
-                  <div>
-                    <label className="block text-slate-400 mb-1">Payment Method</label>
-                    <select 
-                      value={expenseForm.paymentMode}
-                      onChange={e => setExpenseForm({ ...expenseForm, paymentMode: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]"
-                    >
-                      <option value="UPI">UPI</option>
-                      <option value="Bank Transfer">Bank Transfer</option>
-                      <option value="Credit Card">Credit Card</option>
-                      <option value="Cash">Cash</option>
-                    </select>
                   </div>
                   <div className="flex justify-end gap-2 pt-3 border-t border-slate-800 mt-4">
                     <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg">Cancel</button>
-                    <button type="submit" className="px-5 py-2 bg-rose-500 text-white font-medium rounded-lg hover:bg-rose-600">Save Expense</button>
+                    <button type="submit" className="px-5 py-2 bg-rose-500 text-white font-medium rounded-lg">Save Expense</button>
                   </div>
                 </form>
               </div>
@@ -1806,7 +1757,7 @@
               <div className="bg-[#0F131D] border border-slate-800 w-full max-w-xs rounded-2xl p-5 shadow-2xl">
                 <h3 className="text-sm font-bold text-white mb-2">Update Progress</h3>
                 <p className="text-xs text-slate-400 mb-4">{progressModalData.title}</p>
-                <form onSubmit={handleUpdateProgress} className="space-y-4">
+                <div className="space-y-4">
                   <div>
                     <div className="flex justify-between text-xs text-slate-300 mb-1">
                       <span>Percentage</span>
@@ -1820,15 +1771,23 @@
                     />
                   </div>
                   <div className="flex justify-end gap-2">
-                    <button type="button" onClick={() => setProgressModalData(null)} className="px-3 py-1.5 bg-slate-800 text-xs text-slate-300 rounded-lg">Cancel</button>
-                    <button type="submit" className="px-4 py-1.5 bg-[#FF6A00] text-xs text-white font-medium rounded-lg hover:bg-[#FF7A00]">Update</button>
+                    <button onClick={() => setProgressModalData(null)} className="px-3 py-1.5 bg-slate-800 text-xs text-slate-300 rounded-lg">Cancel</button>
+                    <button 
+                      onClick={() => {
+                        setProjects(projects.map(p => p.id === progressModalData.id ? { ...p, progress: parseInt(progressModalData.progress) || 0 } : p));
+                        setProgressModalData(null);
+                      }} 
+                      className="px-4 py-1.5 bg-[#FF6A00] text-xs text-white font-medium rounded-lg"
+                    >
+                      Update
+                    </button>
                   </div>
-                </form>
+                </div>
               </div>
             </div>
           )}
 
-          {/* ==================== ADVANCED INVOICE PRINT / PDF MODAL ==================== */}
+          {/* ==================== TAX INVOICE PRINT / PDF MODAL ==================== */}
           {printInvoiceData && (
             <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
               <div className="bg-white text-slate-900 w-full max-w-3xl rounded-xl p-8 max-h-[92vh] overflow-y-auto" id="print-area">
@@ -1836,7 +1795,7 @@
                 <div className="flex justify-between items-start border-b pb-5 mb-5">
                   <div className="space-y-1">
                     <h2 className="text-2xl font-black tracking-tight text-slate-900">{agency.name}</h2>
-                    <p className="text-xs font-semibold text-[#FF6A00] tracking-wider uppercase">{agency.tagline}</p>
+                    <p className="text-xs font-semibold text-[#FF6A00] tracking-wider uppercase">Branding Agency</p>
                     <p className="text-xs text-slate-600 max-w-sm mt-1">{agency.address}</p>
                     <p className="text-xs text-slate-600">Phone: {agency.phone} | Email: {agency.email}</p>
                     <p className="text-xs font-bold text-slate-800">GSTIN: {agency.gstin}</p>
@@ -1863,7 +1822,6 @@
                   <div className="text-right">
                     <p className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Place of Supply:</p>
                     <p className="font-semibold text-slate-800">24 - Gujarat</p>
-                    <p className="text-[11px] text-slate-500 mt-1">Tax Method: {printInvoiceData.taxType === 'IGST' ? 'Inter-state IGST' : 'Intra-state CGST+SGST'}</p>
                   </div>
                 </div>
 
@@ -1905,17 +1863,12 @@
                       <p><span className="text-slate-500">IFSC Code:</span> <span className="font-bold font-mono">{agency.ifsc}</span></p>
                       <p><span className="text-slate-500">UPI ID:</span> <span className="font-semibold text-[#FF6A00]">{agency.upiId}</span></p>
                     </div>
-                    {printInvoiceData.paymentTerms && (
-                      <p className="text-[11px] text-slate-500 pt-1 italic">
-                        <strong>Terms:</strong> {printInvoiceData.paymentTerms}
-                      </p>
-                    )}
                   </div>
 
                   <div className="space-y-1.5 text-right">
                     <div className="flex justify-between text-slate-600">
                       <span>Total Taxable Subtotal:</span>
-                      <span className="font-semibold">₹{(printInvoiceData.subtotal || printInvoiceData.items.reduce((a,b)=>a+b.amount,0)).toLocaleString('en-IN')}</span>
+                      <span className="font-semibold">₹{(printInvoiceData.subtotal || 0).toLocaleString('en-IN')}</span>
                     </div>
 
                     {printInvoiceData.discount > 0 && (
@@ -1925,28 +1878,10 @@
                       </div>
                     )}
 
-                    {printInvoiceData.taxType === 'IGST' ? (
-                      <div className="flex justify-between text-slate-600">
-                        <span>Integrated GST (IGST 18%):</span>
-                        <span className="font-semibold">₹{(printInvoiceData.taxAmount || 0).toLocaleString('en-IN')}</span>
-                      </div>
-                    ) : printInvoiceData.taxType === 'NONE' ? (
-                      <div className="flex justify-between text-slate-600">
-                        <span>GST (Exempt):</span>
-                        <span className="font-semibold">₹0</span>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex justify-between text-slate-600">
-                          <span>Central GST (CGST 9%):</span>
-                          <span className="font-semibold">₹{Math.round((printInvoiceData.taxAmount || 0) / 2).toLocaleString('en-IN')}</span>
-                        </div>
-                        <div className="flex justify-between text-slate-600">
-                          <span>State GST (SGST 9%):</span>
-                          <span className="font-semibold">₹{Math.round((printInvoiceData.taxAmount || 0) / 2).toLocaleString('en-IN')}</span>
-                        </div>
-                      </>
-                    )}
+                    <div className="flex justify-between text-slate-600">
+                      <span>GST (18%):</span>
+                      <span className="font-semibold">₹{(printInvoiceData.taxAmount || 0).toLocaleString('en-IN')}</span>
+                    </div>
 
                     <div className="flex justify-between text-sm font-black text-slate-900 border-t border-slate-300 pt-2">
                       <span>Invoice Total:</span>
@@ -1967,16 +1902,14 @@
                   </div>
                 </div>
 
-                {/* Signature Block */}
+                {/* Signature Block (Vikas Modi name removed, clean official line kept) */}
                 <div className="flex justify-between items-end mt-12 pt-4 border-t border-slate-200">
                   <div className="text-[10px] text-slate-400">
-                    <p>Computer generated invoice, signature valid digitally.</p>
+                    <p>Computer generated invoice, valid digitally.</p>
                     <p>Thank you for partnering with TRIOSEPT DESIGN STUDIO.</p>
                   </div>
                   <div className="text-center">
-                    <div className="w-36 border-b border-slate-400 pb-1 mb-1 font-serif italic text-slate-700">
-                      Vikas Modi
-                    </div>
+                    <div className="w-40 border-b border-slate-400 h-10 mb-2"></div>
                     <p className="text-[10px] font-bold uppercase text-slate-700">Authorized Signatory</p>
                     <p className="text-[9px] text-slate-500">TRIOSEPT DESIGN STUDIO</p>
                   </div>
@@ -1992,7 +1925,7 @@
                   </button>
                   <button 
                     onClick={() => window.print()}
-                    className="px-5 py-2 text-xs bg-[#FF6A00] text-white font-bold rounded-lg hover:bg-[#FF7A00] shadow-md shadow-[#FF6A00]/20"
+                    className="px-5 py-2 text-xs bg-[#FF6A00] text-white font-bold rounded-lg hover:bg-[#FF7A00]"
                   >
                     Print / Download PDF
                   </button>
