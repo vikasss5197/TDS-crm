@@ -12,7 +12,7 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   
-  <!-- Babel Standalone (JSX compile karva mate) -->
+  <!-- Babel Standalone -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   
   <style>
@@ -38,9 +38,8 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useMemo, useEffect, useRef } = React;
+    const { useState, useMemo, useEffect } = React;
 
-    // --- DEFAULT INITIAL DATA ---
     const DEFAULT_AGENCY = {
       name: 'TRIOSEPT DESIGN STUDIO',
       tagline: 'Branding & Graphic Design Agency',
@@ -96,9 +95,7 @@
       { id: 'INV-2026-064', clientId: 'CL-103', clientName: 'UrbanCraft Apparel', date: '2026-10-26', dueDate: '2026-11-10', amount: 41300, paidAmount: 20000, status: 'Partially Paid', items: [{ desc: 'Festive Social Media Creative Campaign (Monthly Pack)', qty: 1, rate: 35000, amount: 35000 }] }
     ];
 
-    // --- MAIN APP COMPONENT ---
     function App() {
-      // LocalStorage Helper
       const loadLocal = (key, fallback) => {
         try {
           const item = localStorage.getItem(key);
@@ -122,7 +119,16 @@
       const [printInvoiceData, setPrintInvoiceData] = useState(null);
       const [syncTime, setSyncTime] = useState(new Date().toLocaleTimeString());
 
-      // Auto-save back to localStorage
+      // MODAL CONTROLS
+      const [activeModal, setActiveModal] = useState(null);
+      const [clientForm, setClientForm] = useState({ name: '', contactPerson: '', phone: '', email: '', industry: '', city: 'Ahmedabad', gstin: '' });
+      const [leadForm, setLeadForm] = useState({ leadName: '', companyName: '', phone: '', email: '', service: 'FMCG Packaging Design', budget: 50000 });
+      const [projectForm, setProjectForm] = useState({ title: '', clientId: '', budget: 50000, deadline: '', designer: 'Vikas Modi', priority: 'High' });
+      const [taskForm, setTaskForm] = useState({ title: '', assignedTo: 'Design Team', dueDate: '', priority: 'Medium' });
+      const [expenseForm, setExpenseForm] = useState({ title: '', category: 'Software Subscriptions', amount: '', paymentMode: 'UPI' });
+      const [invoiceForm, setInvoiceForm] = useState({ clientName: '', desc: 'Brand Design Services', rate: '' });
+      const [progressModalData, setProgressModalData] = useState(null);
+
       useEffect(() => {
         localStorage.setItem('triosept_agency', JSON.stringify(agency));
         localStorage.setItem('triosept_clients', JSON.stringify(clients));
@@ -135,13 +141,11 @@
         setSyncTime(new Date().toLocaleTimeString());
       }, [agency, clients, leads, projects, tasks, expenses, invoices, customSvg]);
 
-      // Metrics Calculation
       const totalRevenue = useMemo(() => invoices.reduce((acc, inv) => acc + (inv.paidAmount || 0), 0), [invoices]);
       const totalExpenses = useMemo(() => expenses.reduce((acc, exp) => acc + exp.amount, 0), [expenses]);
       const netProfit = totalRevenue - totalExpenses;
       const totalOutstanding = useMemo(() => invoices.reduce((acc, inv) => acc + (inv.amount - (inv.paidAmount || 0)), 0), [invoices]);
 
-      // SVG Upload Handler
       const handleSvgUpload = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -151,12 +155,132 @@
         }
       };
 
+      // MODAL SUBMIT HANDLERS
+      const handleCreateClient = (e) => {
+        e.preventDefault();
+        if (!clientForm.name) return;
+        const newClient = {
+          id: `CL-${Math.floor(100 + Math.random() * 900)}`,
+          name: clientForm.name,
+          contactPerson: clientForm.contactPerson || 'Authorized Rep',
+          phone: clientForm.phone || '+91 90000 00000',
+          email: clientForm.email || 'info@client.com',
+          industry: clientForm.industry || 'General',
+          city: clientForm.city || 'Ahmedabad',
+          gstin: clientForm.gstin || '24AAAAA0000A1Z5',
+          totalBilled: 0,
+          outstanding: 0
+        };
+        setClients([...clients, newClient]);
+        setActiveModal(null);
+        setClientForm({ name: '', contactPerson: '', phone: '', email: '', industry: '', city: 'Ahmedabad', gstin: '' });
+      };
+
+      const handleCreateLead = (e) => {
+        e.preventDefault();
+        if (!leadForm.leadName) return;
+        const newLead = {
+          id: `LD-${Math.floor(100 + Math.random() * 900)}`,
+          leadName: leadForm.leadName,
+          companyName: leadForm.companyName || 'New Prospect',
+          phone: leadForm.phone || '+91 90000 00000',
+          email: leadForm.email || 'lead@mail.com',
+          service: leadForm.service,
+          budget: parseInt(leadForm.budget) || 50000,
+          stage: 'New'
+        };
+        setLeads([...leads, newLead]);
+        setActiveModal(null);
+        setLeadForm({ leadName: '', companyName: '', phone: '', email: '', service: 'FMCG Packaging Design', budget: 50000 });
+      };
+
+      const handleCreateProject = (e) => {
+        e.preventDefault();
+        if (!projectForm.title) return;
+        const selectedCl = clients.find(c => c.id === projectForm.clientId) || clients[0];
+        const newProj = {
+          id: `PRJ-${Math.floor(100 + Math.random() * 900)}`,
+          title: projectForm.title,
+          clientId: selectedCl ? selectedCl.id : 'CL-101',
+          clientName: selectedCl ? selectedCl.name : 'Vedic Pure Foods Pvt Ltd',
+          budget: parseInt(projectForm.budget) || 50000,
+          deadline: projectForm.deadline || new Date().toISOString().split('T')[0],
+          designer: projectForm.designer || 'Vikas Modi',
+          priority: projectForm.priority || 'High',
+          status: 'In Progress',
+          progress: 10
+        };
+        setProjects([...projects, newProj]);
+        setActiveModal(null);
+        setProjectForm({ title: '', clientId: '', budget: 50000, deadline: '', designer: 'Vikas Modi', priority: 'High' });
+      };
+
+      const handleCreateTask = (e) => {
+        e.preventDefault();
+        if (!taskForm.title || !selectedClientForView) return;
+        const newTask = {
+          id: `TSK-${Math.floor(1000 + Math.random() * 9000)}`,
+          clientId: selectedClientForView.id,
+          title: taskForm.title,
+          assignedTo: taskForm.assignedTo || 'Design Team',
+          dueDate: taskForm.dueDate || new Date().toISOString().split('T')[0],
+          priority: taskForm.priority || 'Medium',
+          completed: false
+        };
+        setTasks([...tasks, newTask]);
+        setActiveModal(null);
+        setTaskForm({ title: '', assignedTo: 'Design Team', dueDate: '', priority: 'Medium' });
+      };
+
+      const handleCreateExpense = (e) => {
+        e.preventDefault();
+        if (!expenseForm.title || !expenseForm.amount) return;
+        const newExpense = {
+          id: `EXP-${Math.floor(100 + Math.random() * 900)}`,
+          title: expenseForm.title,
+          category: expenseForm.category,
+          amount: parseInt(expenseForm.amount) || 0,
+          date: new Date().toISOString().split('T')[0],
+          paymentMode: expenseForm.paymentMode
+        };
+        setExpenses([...expenses, newExpense]);
+        setActiveModal(null);
+        setExpenseForm({ title: '', category: 'Software Subscriptions', amount: '', paymentMode: 'UPI' });
+      };
+
+      const handleCreateInvoice = (e) => {
+        e.preventDefault();
+        if (!invoiceForm.clientName || !invoiceForm.rate) return;
+        const subtotal = parseInt(invoiceForm.rate) || 0;
+        const total = Math.round(subtotal * 1.18);
+        const newInvoice = {
+          id: `INV-2026-${Math.floor(100 + Math.random() * 900)}`,
+          clientId: 'CL-101',
+          clientName: invoiceForm.clientName,
+          date: new Date().toISOString().split('T')[0],
+          dueDate: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+          amount: total,
+          paidAmount: 0,
+          status: 'Unpaid',
+          items: [{ desc: invoiceForm.desc || 'Brand Design Services', qty: 1, rate: subtotal, amount: subtotal }]
+        };
+        setInvoices([...invoices, newInvoice]);
+        setActiveModal(null);
+        setInvoiceForm({ clientName: '', desc: 'Brand Design Services', rate: '' });
+      };
+
+      const handleUpdateProgress = (e) => {
+        e.preventDefault();
+        if (!progressModalData) return;
+        setProjects(projects.map(p => p.id === progressModalData.id ? { ...p, progress: parseInt(progressModalData.progress) || 0 } : p));
+        setProgressModalData(null);
+      };
+
       return (
         <div className="flex min-h-screen">
           {/* SIDEBAR */}
           <aside className="w-64 bg-[#0F131D] border-r border-slate-800 flex flex-col justify-between shrink-0 p-4">
             <div>
-              {/* BRAND LOGO */}
               <div className="flex items-center gap-3 px-2 py-3 mb-6 border-b border-slate-800">
                 {customSvg ? (
                   <div className="w-8 h-8 flex items-center justify-center shrink-0" dangerouslySetInnerHTML={{ __html: customSvg }} />
@@ -171,7 +295,6 @@
                 </div>
               </div>
 
-              {/* NAVIGATION */}
               <nav className="space-y-1">
                 {[
                   { id: 'dashboard', label: 'Dashboard' },
@@ -197,7 +320,6 @@
               </nav>
             </div>
 
-            {/* SYNC STATUS */}
             <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800/80 text-[11px] text-slate-400">
               <div className="flex items-center gap-2 mb-1">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -209,7 +331,6 @@
 
           {/* MAIN CONTENT AREA */}
           <main className="flex-1 p-8 overflow-y-auto">
-            {/* TOP BAR */}
             <div className="flex justify-between items-center mb-8">
               <div>
                 <h2 className="text-xl font-bold capitalize text-white">
@@ -254,7 +375,6 @@
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Recent Active Projects */}
                   <div className="p-5 bg-[#0F131D] border border-slate-800 rounded-xl">
                     <h3 className="text-sm font-semibold text-white mb-4">Active Projects</h3>
                     <div className="space-y-3">
@@ -272,7 +392,6 @@
                     </div>
                   </div>
 
-                  {/* Upcoming Client Tasks */}
                   <div className="p-5 bg-[#0F131D] border border-slate-800 rounded-xl">
                     <h3 className="text-sm font-semibold text-white mb-4">Urgent Tasks & Deliverables</h3>
                     <div className="space-y-2">
@@ -306,25 +425,7 @@
                     <div className="flex justify-between items-center">
                       <p className="text-xs text-slate-400">Total Clients: {clients.length}</p>
                       <button 
-                        onClick={() => {
-                          const name = prompt('Company Name:');
-                          const contactPerson = prompt('Contact Person:');
-                          const phone = prompt('Phone:');
-                          if (name) {
-                            setClients([...clients, {
-                              id: `CL-${Math.floor(100 + Math.random() * 900)}`,
-                              name,
-                              contactPerson: contactPerson || 'Authorized Rep',
-                              phone: phone || '+91 90000 00000',
-                              email: 'info@client.com',
-                              industry: 'General',
-                              city: 'Ahmedabad',
-                              gstin: '24AAAAA0000A1Z5',
-                              totalBilled: 0,
-                              outstanding: 0
-                            }]);
-                          }
-                        }}
+                        onClick={() => setActiveModal('newClient')}
                         className="px-3 py-1.5 bg-[#FF6A00] text-white text-xs font-medium rounded-lg hover:bg-[#FF7A00]"
                       >
                         + Add Client
@@ -370,7 +471,6 @@
                     </div>
                   </div>
                 ) : (
-                  /* CLIENT 360 VIEW */
                   <div className="space-y-6">
                     <button 
                       onClick={() => setSelectedClientForView(null)}
@@ -391,25 +491,11 @@
                       </div>
                     </div>
 
-                    {/* CLIENT INTEGRATED TASKS & WORKFLOW */}
                     <div className="p-5 bg-[#0F131D] border border-slate-800 rounded-xl space-y-4">
                       <div className="flex justify-between items-center">
                         <h4 className="text-sm font-semibold text-white">Client Tasks & Project Workflow</h4>
                         <button 
-                          onClick={() => {
-                            const title = prompt('Task Title:');
-                            if (title) {
-                              setTasks([...tasks, {
-                                id: `TSK-${Math.floor(1000 + Math.random() * 9000)}`,
-                                clientId: selectedClientForView.id,
-                                title,
-                                assignedTo: 'Design Team',
-                                dueDate: new Date().toISOString().split('T')[0],
-                                priority: 'Medium',
-                                completed: false
-                              }]);
-                            }
-                          }}
+                          onClick={() => setActiveModal('newTask')}
                           className="px-2.5 py-1 bg-[#FF6A00] text-white rounded text-xs"
                         >
                           + Add Task
@@ -458,24 +544,7 @@
                 <div className="flex justify-between items-center">
                   <p className="text-xs text-slate-400">Sales Inquiries & Pipeline</p>
                   <button 
-                    onClick={() => {
-                      const name = prompt('Lead / Contact Name:');
-                      const company = prompt('Company:');
-                      const service = prompt('Service Requested:');
-                      const budget = prompt('Estimated Budget:');
-                      if (name) {
-                        setLeads([...leads, {
-                          id: `LD-${Math.floor(100 + Math.random() * 900)}`,
-                          leadName: name,
-                          companyName: company || 'New Prospect',
-                          phone: '+91 90000 00000',
-                          email: 'lead@mail.com',
-                          service: service || 'Branding',
-                          budget: budget ? parseInt(budget) : 50000,
-                          stage: 'New'
-                        }]);
-                      }
-                    }}
+                    onClick={() => setActiveModal('newLead')}
                     className="px-3 py-1.5 bg-[#FF6A00] text-white text-xs font-medium rounded-lg"
                   >
                     + Add Lead
@@ -512,7 +581,6 @@
                       <div className="pt-2 flex justify-between border-t border-slate-800/80">
                         <button 
                           onClick={() => {
-                            // Convert to client
                             setClients([...clients, {
                               id: `CL-${Math.floor(100 + Math.random() * 900)}`,
                               name: l.companyName,
@@ -551,25 +619,7 @@
                 <div className="flex justify-between items-center">
                   <p className="text-xs text-slate-400">Creative Production Workspaces</p>
                   <button 
-                    onClick={() => {
-                      const title = prompt('Project Title:');
-                      const clientName = prompt('Client Name:');
-                      const budget = prompt('Budget:');
-                      if (title) {
-                        setProjects([...projects, {
-                          id: `PRJ-${Math.floor(100 + Math.random() * 900)}`,
-                          title,
-                          clientId: 'CL-101',
-                          clientName: clientName || 'Vedic Pure Foods Pvt Ltd',
-                          budget: budget ? parseInt(budget) : 50000,
-                          deadline: new Date().toISOString().split('T')[0],
-                          designer: 'Vikas Modi',
-                          priority: 'High',
-                          status: 'In Progress',
-                          progress: 10
-                        }]);
-                      }
-                    }}
+                    onClick={() => setActiveModal('newProject')}
                     className="px-3 py-1.5 bg-[#FF6A00] text-white text-xs font-medium rounded-lg"
                   >
                     + New Project
@@ -604,12 +654,7 @@
 
                       <div className="flex justify-between pt-2 border-t border-slate-800">
                         <button 
-                          onClick={() => {
-                            const newProgress = prompt('Update progress (0-100):', p.progress);
-                            if (newProgress !== null) {
-                              setProjects(projects.map(item => item.id === p.id ? { ...item, progress: parseInt(newProgress) || 0 } : item));
-                            }
-                          }}
+                          onClick={() => setProgressModalData({ id: p.id, title: p.title, progress: p.progress })}
                           className="text-xs text-slate-300 hover:text-white"
                         >
                           Update Progress
@@ -630,30 +675,11 @@
             {/* ACCOUNTS & FINANCE MODULE */}
             {activeTab === 'finance' && (
               <div className="space-y-6">
-                {/* Invoices List */}
                 <div className="p-5 bg-[#0F131D] border border-slate-800 rounded-xl space-y-4">
                   <div className="flex justify-between items-center">
                     <h3 className="text-sm font-semibold text-white">Client Invoices</h3>
                     <button 
-                      onClick={() => {
-                        const clientName = prompt('Client Name:');
-                        const amount = prompt('Total Taxable Amount:');
-                        if (clientName && amount) {
-                          const subtotal = parseInt(amount);
-                          const total = Math.round(subtotal * 1.18); // with 18% GST
-                          setInvoices([...invoices, {
-                            id: `INV-2026-${Math.floor(100 + Math.random() * 900)}`,
-                            clientId: 'CL-101',
-                            clientName,
-                            date: new Date().toISOString().split('T')[0],
-                            dueDate: new Date(Date.now() + 15*86400000).toISOString().split('T')[0],
-                            amount: total,
-                            paidAmount: 0,
-                            status: 'Unpaid',
-                            items: [{ desc: 'Brand Design Services', qty: 1, rate: subtotal, amount: subtotal }]
-                          }]);
-                        }
-                      }}
+                      onClick={() => setActiveModal('newInvoice')}
                       className="px-2.5 py-1 bg-[#FF6A00] text-white rounded text-xs"
                     >
                       + Create Invoice
@@ -689,26 +715,11 @@
                   </div>
                 </div>
 
-                {/* Studio Expenses */}
                 <div className="p-5 bg-[#0F131D] border border-slate-800 rounded-xl space-y-4">
                   <div className="flex justify-between items-center">
                     <h3 className="text-sm font-semibold text-white">Studio Expenses</h3>
                     <button 
-                      onClick={() => {
-                        const title = prompt('Expense Description:');
-                        const amount = prompt('Amount (₹):');
-                        const category = prompt('Category (Software/Hardware/Printing/Freelancer):');
-                        if (title && amount) {
-                          setExpenses([...expenses, {
-                            id: `EXP-${Math.floor(100 + Math.random() * 900)}`,
-                            title,
-                            category: category || 'Office Expenses',
-                            amount: parseInt(amount),
-                            date: new Date().toISOString().split('T')[0],
-                            paymentMode: 'UPI'
-                          }]);
-                        }
-                      }}
+                      onClick={() => setActiveModal('newExpense')}
                       className="px-2.5 py-1 bg-rose-500 text-white rounded text-xs"
                     >
                       + Record Expense
@@ -777,7 +788,6 @@
             {/* SETTINGS MODULE */}
             {activeTab === 'settings' && (
               <div className="space-y-6 max-w-2xl">
-                {/* SVG LOGO CONTROL */}
                 <div className="p-5 bg-[#0F131D] border border-slate-800 rounded-xl space-y-4">
                   <h3 className="text-sm font-semibold text-white">Agency SVG Logo Control</h3>
                   <p className="text-xs text-slate-400">
@@ -812,7 +822,6 @@
                   )}
                 </div>
 
-                {/* STUDIO DETAILS */}
                 <div className="p-5 bg-[#0F131D] border border-slate-800 rounded-xl space-y-3">
                   <h3 className="text-sm font-semibold text-white">Official Studio & Bank Details</h3>
                   <div className="space-y-2 text-xs">
@@ -871,11 +880,470 @@
             )}
           </main>
 
+          {/* ==================== SYSTEM INTEGRATED DIALOGUES / MODALS ==================== */}
+
+          {/* ADD CLIENT MODAL */}
+          {activeModal === 'newClient' && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div className="bg-[#0F131D] border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
+                <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-800">
+                  <h3 className="text-base font-bold text-white">Add New Client</h3>
+                  <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-white">✕</button>
+                </div>
+                <form onSubmit={handleCreateClient} className="space-y-3 text-xs">
+                  <div>
+                    <label className="block text-slate-400 mb-1">Company Name *</label>
+                    <input 
+                      type="text" required 
+                      value={clientForm.name} 
+                      onChange={e => setClientForm({ ...clientForm, name: e.target.value })} 
+                      placeholder="e.g. Acme Brands Pvt Ltd"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-400 mb-1">Contact Person</label>
+                      <input 
+                        type="text" 
+                        value={clientForm.contactPerson} 
+                        onChange={e => setClientForm({ ...clientForm, contactPerson: e.target.value })} 
+                        placeholder="e.g. Ramesh Patel"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 mb-1">Phone Number</label>
+                      <input 
+                        type="text" 
+                        value={clientForm.phone} 
+                        onChange={e => setClientForm({ ...clientForm, phone: e.target.value })} 
+                        placeholder="+91 98765 43210"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-400 mb-1">Email Address</label>
+                      <input 
+                        type="email" 
+                        value={clientForm.email} 
+                        onChange={e => setClientForm({ ...clientForm, email: e.target.value })} 
+                        placeholder="client@mail.com"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 mb-1">City</label>
+                      <input 
+                        type="text" 
+                        value={clientForm.city} 
+                        onChange={e => setClientForm({ ...clientForm, city: e.target.value })} 
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-400 mb-1">Industry</label>
+                      <input 
+                        type="text" 
+                        value={clientForm.industry} 
+                        onChange={e => setClientForm({ ...clientForm, industry: e.target.value })} 
+                        placeholder="FMCG / Retail / Corporate"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 mb-1">GSTIN</label>
+                      <input 
+                        type="text" 
+                        value={clientForm.gstin} 
+                        onChange={e => setClientForm({ ...clientForm, gstin: e.target.value })} 
+                        placeholder="24AAAAA0000A1Z5"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-3 border-t border-slate-800 mt-4">
+                    <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg">Cancel</button>
+                    <button type="submit" className="px-5 py-2 bg-[#FF6A00] text-white font-medium rounded-lg hover:bg-[#FF7A00]">Save Client</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ADD LEAD MODAL */}
+          {activeModal === 'newLead' && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div className="bg-[#0F131D] border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
+                <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-800">
+                  <h3 className="text-base font-bold text-white">Add New Lead</h3>
+                  <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-white">✕</button>
+                </div>
+                <form onSubmit={handleCreateLead} className="space-y-3 text-xs">
+                  <div>
+                    <label className="block text-slate-400 mb-1">Contact Person Name *</label>
+                    <input 
+                      type="text" required 
+                      value={leadForm.leadName} 
+                      onChange={e => setLeadForm({ ...leadForm, leadName: e.target.value })} 
+                      placeholder="e.g. Nirav Dave"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">Company / Brand Name</label>
+                    <input 
+                      type="text" 
+                      value={leadForm.companyName} 
+                      onChange={e => setLeadForm({ ...leadForm, companyName: e.target.value })} 
+                      placeholder="e.g. Dave Sweets & Farsan"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-400 mb-1">Phone</label>
+                      <input 
+                        type="text" 
+                        value={leadForm.phone} 
+                        onChange={e => setLeadForm({ ...leadForm, phone: e.target.value })} 
+                        placeholder="+91 98980 00000"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 mb-1">Email</label>
+                      <input 
+                        type="email" 
+                        value={leadForm.email} 
+                        onChange={e => setLeadForm({ ...leadForm, email: e.target.value })} 
+                        placeholder="lead@brand.com"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-400 mb-1">Service Required</label>
+                      <select 
+                        value={leadForm.service}
+                        onChange={e => setLeadForm({ ...leadForm, service: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]"
+                      >
+                        <option value="Logo Design & Identity">Logo Design & Identity</option>
+                        <option value="Complete Branding">Complete Branding</option>
+                        <option value="FMCG Packaging Design">FMCG Packaging Design</option>
+                        <option value="Social Media Creatives">Social Media Creatives</option>
+                        <option value="Brochure & Catalogue">Brochure & Catalogue</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 mb-1">Estimated Budget (₹)</label>
+                      <input 
+                        type="number" 
+                        value={leadForm.budget} 
+                        onChange={e => setLeadForm({ ...leadForm, budget: e.target.value })} 
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-3 border-t border-slate-800 mt-4">
+                    <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg">Cancel</button>
+                    <button type="submit" className="px-5 py-2 bg-[#FF6A00] text-white font-medium rounded-lg hover:bg-[#FF7A00]">Save Lead</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ADD PROJECT MODAL */}
+          {activeModal === 'newProject' && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div className="bg-[#0F131D] border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
+                <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-800">
+                  <h3 className="text-base font-bold text-white">New Project Workspace</h3>
+                  <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-white">✕</button>
+                </div>
+                <form onSubmit={handleCreateProject} className="space-y-3 text-xs">
+                  <div>
+                    <label className="block text-slate-400 mb-1">Project Title *</label>
+                    <input 
+                      type="text" required 
+                      value={projectForm.title} 
+                      onChange={e => setProjectForm({ ...projectForm, title: e.target.value })} 
+                      placeholder="e.g. FMCG Box & Label 3D Visuals"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">Assign Client</label>
+                    <select 
+                      value={projectForm.clientId}
+                      onChange={e => setProjectForm({ ...projectForm, clientId: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]"
+                    >
+                      {clients.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-400 mb-1">Project Budget (₹)</label>
+                      <input 
+                        type="number" 
+                        value={projectForm.budget} 
+                        onChange={e => setProjectForm({ ...projectForm, budget: e.target.value })} 
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 mb-1">Target Deadline</label>
+                      <input 
+                        type="date" 
+                        value={projectForm.deadline} 
+                        onChange={e => setProjectForm({ ...projectForm, deadline: e.target.value })} 
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-400 mb-1">Lead Designer</label>
+                      <input 
+                        type="text" 
+                        value={projectForm.designer} 
+                        onChange={e => setProjectForm({ ...projectForm, designer: e.target.value })} 
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 mb-1">Priority</label>
+                      <select 
+                        value={projectForm.priority}
+                        onChange={e => setProjectForm({ ...projectForm, priority: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]"
+                      >
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                        <option value="Urgent">Urgent</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-3 border-t border-slate-800 mt-4">
+                    <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg">Cancel</button>
+                    <button type="submit" className="px-5 py-2 bg-[#FF6A00] text-white font-medium rounded-lg hover:bg-[#FF7A00]">Launch Workspace</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ADD TASK MODAL (CLIENT 360) */}
+          {activeModal === 'newTask' && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div className="bg-[#0F131D] border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
+                <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-800">
+                  <h3 className="text-base font-bold text-white">Add Task for {selectedClientForView ? selectedClientForView.name : ''}</h3>
+                  <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-white">✕</button>
+                </div>
+                <form onSubmit={handleCreateTask} className="space-y-3 text-xs">
+                  <div>
+                    <label className="block text-slate-400 mb-1">Task Title *</label>
+                    <input 
+                      type="text" required 
+                      value={taskForm.title} 
+                      onChange={e => setTaskForm({ ...taskForm, title: e.target.value })} 
+                      placeholder="e.g. Export Print Ready CMYK Vector Dielines"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-400 mb-1">Assigned Designer</label>
+                      <input 
+                        type="text" 
+                        value={taskForm.assignedTo} 
+                        onChange={e => setTaskForm({ ...taskForm, assignedTo: e.target.value })} 
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 mb-1">Due Date</label>
+                      <input 
+                        type="date" 
+                        value={taskForm.dueDate} 
+                        onChange={e => setTaskForm({ ...taskForm, dueDate: e.target.value })} 
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-3 border-t border-slate-800 mt-4">
+                    <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg">Cancel</button>
+                    <button type="submit" className="px-5 py-2 bg-[#FF6A00] text-white font-medium rounded-lg hover:bg-[#FF7A00]">Add Task</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* RECORD EXPENSE MODAL */}
+          {activeModal === 'newExpense' && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div className="bg-[#0F131D] border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
+                <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-800">
+                  <h3 className="text-base font-bold text-white">Record Studio Expense</h3>
+                  <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-white">✕</button>
+                </div>
+                <form onSubmit={handleCreateExpense} className="space-y-3 text-xs">
+                  <div>
+                    <label className="block text-slate-400 mb-1">Expense Description *</label>
+                    <input 
+                      type="text" required 
+                      value={expenseForm.title} 
+                      onChange={e => setExpenseForm({ ...expenseForm, title: e.target.value })} 
+                      placeholder="e.g. Adobe Suite Monthly License"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-400 mb-1">Expense Category</label>
+                      <select 
+                        value={expenseForm.category}
+                        onChange={e => setExpenseForm({ ...expenseForm, category: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]"
+                      >
+                        <option value="Software Subscriptions">Software Subscriptions</option>
+                        <option value="Hardware Expenses">Hardware Expenses</option>
+                        <option value="Printing Expenses">Printing Expenses</option>
+                        <option value="Freelancer Payments">Freelancer Payments</option>
+                        <option value="Office & Tea Expenses">Office & Tea Expenses</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 mb-1">Amount (₹) *</label>
+                      <input 
+                        type="number" required 
+                        value={expenseForm.amount} 
+                        onChange={e => setExpenseForm({ ...expenseForm, amount: e.target.value })} 
+                        placeholder="5000"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">Payment Method</label>
+                    <select 
+                      value={expenseForm.paymentMode}
+                      onChange={e => setExpenseForm({ ...expenseForm, paymentMode: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]"
+                    >
+                      <option value="UPI">UPI</option>
+                      <option value="Bank Transfer">Bank Transfer</option>
+                      <option value="Credit Card">Credit Card</option>
+                      <option value="Cash">Cash</option>
+                    </select>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-3 border-t border-slate-800 mt-4">
+                    <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg">Cancel</button>
+                    <button type="submit" className="px-5 py-2 bg-rose-500 text-white font-medium rounded-lg hover:bg-rose-600">Save Expense</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* CREATE INVOICE MODAL */}
+          {activeModal === 'newInvoice' && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div className="bg-[#0F131D] border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
+                <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-800">
+                  <h3 className="text-base font-bold text-white">Create Client Tax Invoice</h3>
+                  <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-white">✕</button>
+                </div>
+                <form onSubmit={handleCreateInvoice} className="space-y-3 text-xs">
+                  <div>
+                    <label className="block text-slate-400 mb-1">Client Name *</label>
+                    <input 
+                      type="text" required 
+                      value={invoiceForm.clientName} 
+                      onChange={e => setInvoiceForm({ ...invoiceForm, clientName: e.target.value })} 
+                      placeholder="e.g. Vedic Pure Foods Pvt Ltd"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">Service Line Description</label>
+                    <input 
+                      type="text" 
+                      value={invoiceForm.desc} 
+                      onChange={e => setInvoiceForm({ ...invoiceForm, desc: e.target.value })} 
+                      placeholder="e.g. Master Packaging Design Sprint"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">Taxable Amount (₹) *</label>
+                    <input 
+                      type="number" required 
+                      value={invoiceForm.rate} 
+                      onChange={e => setInvoiceForm({ ...invoiceForm, rate: e.target.value })} 
+                      placeholder="35000"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-[#FF6A00]" 
+                    />
+                  </div>
+                  <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 text-[11px] text-slate-400">
+                    <p>Subtotal: ₹{invoiceForm.rate ? parseInt(invoiceForm.rate).toLocaleString('en-IN') : 0}</p>
+                    <p>+ 18% GST: ₹{invoiceForm.rate ? Math.round(parseInt(invoiceForm.rate) * 0.18).toLocaleString('en-IN') : 0}</p>
+                    <p className="font-bold text-white mt-1">Total: ₹{invoiceForm.rate ? Math.round(parseInt(invoiceForm.rate) * 1.18).toLocaleString('en-IN') : 0}</p>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-3 border-t border-slate-800 mt-4">
+                    <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg">Cancel</button>
+                    <button type="submit" className="px-5 py-2 bg-[#FF6A00] text-white font-medium rounded-lg hover:bg-[#FF7A00]">Generate Invoice</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* UPDATE PROJECT PROGRESS MODAL */}
+          {progressModalData && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div className="bg-[#0F131D] border border-slate-800 w-full max-w-xs rounded-2xl p-5 shadow-2xl">
+                <h3 className="text-sm font-bold text-white mb-2">Update Progress</h3>
+                <p className="text-xs text-slate-400 mb-4">{progressModalData.title}</p>
+                <form onSubmit={handleUpdateProgress} className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-xs text-slate-300 mb-1">
+                      <span>Percentage</span>
+                      <span className="font-bold text-[#FF6A00]">{progressModalData.progress}%</span>
+                    </div>
+                    <input 
+                      type="range" min="0" max="100" 
+                      value={progressModalData.progress} 
+                      onChange={e => setProgressModalData({ ...progressModalData, progress: e.target.value })}
+                      className="w-full accent-[#FF6A00]" 
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => setProgressModalData(null)} className="px-3 py-1.5 bg-slate-800 text-xs text-slate-300 rounded-lg">Cancel</button>
+                    <button type="submit" className="px-4 py-1.5 bg-[#FF6A00] text-xs text-white font-medium rounded-lg hover:bg-[#FF7A00]">Update</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
           {/* INVOICE PRINT MODAL */}
           {printInvoiceData && (
             <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
               <div className="bg-white text-slate-900 w-full max-w-2xl rounded-xl p-8 max-h-[90vh] overflow-y-auto" id="print-area">
-                {/* Header */}
                 <div className="flex justify-between items-start border-b pb-4 mb-4">
                   <div>
                     <h2 className="text-xl font-bold tracking-tight text-slate-900">{agency.name}</h2>
@@ -890,13 +1358,11 @@
                   </div>
                 </div>
 
-                {/* Billed To */}
                 <div className="mb-4">
                   <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Billed To:</p>
                   <p className="text-sm font-bold text-slate-800">{printInvoiceData.clientName}</p>
                 </div>
 
-                {/* Table */}
                 <table className="w-full text-left text-xs mb-6 border">
                   <thead className="bg-slate-100 border-b">
                     <tr>
@@ -918,7 +1384,6 @@
                   </tbody>
                 </table>
 
-                {/* Bank Details & Totals */}
                 <div className="flex justify-between items-start text-xs border-t pt-4">
                   <div>
                     <p className="font-bold text-slate-800">Bank Details for RTGS / NEFT / UPI:</p>
@@ -935,7 +1400,6 @@
                   </div>
                 </div>
 
-                {/* Action Buttons */}
                 <div className="flex justify-end gap-3 mt-6 print:hidden">
                   <button 
                     onClick={() => setPrintInvoiceData(null)}
